@@ -2,6 +2,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  // Sub-path for project Pages (e.g. /mytools/); set by the deploy workflow.
+  // Defaults to '/' for Cloud Run / nginx / local dev.
+  base: process.env.VITE_BASE || '/',
   plugins: [react()],
   server: { port: 5173, host: true },
   build: {
