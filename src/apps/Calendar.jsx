@@ -323,7 +323,7 @@ export default function CalendarApp() {
           </div>
           <div className="toolbar">
             <div className="chip">Expected this month: <strong>{fmtMAD(monthStats.working * (ui.tjm || 0))}</strong></div>
-            <div className="chip">Accrued since start of month: <strong>{fmtMAD(elapsed * (ui.tjm || 0))}</strong></div>
+            <div className="chip">Accrued since start of the month: <strong>{fmtMAD(elapsed * (ui.tjm || 0))}</strong></div>
           </div>
           <div className="hint" style={{ marginTop: 8 }}>
             Accrued = working days elapsed in the selected month × TJM (excludes weekends, public holidays, and vacations).

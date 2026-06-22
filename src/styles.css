@@ -176,9 +176,25 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 }
 .week-header { font-size: 1.05rem; font-weight: 600; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .day-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
-.day-column { background: var(--rowbg); border: 1px solid var(--rowborder); border-radius: 8px; overflow: hidden; }
-.day-header { background: var(--panel-2); padding: 6px; font-weight: 600; text-align: center; font-size: .85rem; }
+.day-column { background: var(--rowbg); border: 1px solid var(--rowborder); border-radius: 8px; overflow: hidden; position: relative; }
+.day-header { background: var(--panel-2); padding: 6px; font-weight: 600; text-align: center; font-size: .85rem; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .day-content { padding: 8px; min-height: 50px; }
+.day-column.my-day {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 6px 18px rgba(79, 209, 197, 0.18);
+}
+.day-column.my-day .day-header {
+  background: var(--accent);
+  color: #06231f;
+}
+.day-column.is-today::before {
+  content: 'today';
+  position: absolute; top: 4px; right: 4px;
+  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  padding: 1px 6px; border-radius: 999px;
+  background: var(--warn); color: #2a1b00;
+}
+.my-pill { font-size: 12px; }
 .person-tag {
   display: inline-block; padding: 2px 8px; background: var(--accent-2); color: var(--accent);
   border: 1px solid var(--accent-border);
@@ -207,6 +223,29 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 .invoice-lines th, .invoice-lines td { border-bottom: 1px solid var(--border); padding: 6px; text-align: left; font-size: 13px; }
 .invoice-lines td input { width: 100%; }
 .invoice-total { text-align: right; font-size: 18px; font-weight: 600; margin-top: 12px; }
+
+/* Recovery code modal */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+.modal-card {
+  width: min(440px, calc(100% - 32px));
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 16px; padding: 24px;
+  display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .35);
+}
+.recovery-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 18px; font-weight: 600; letter-spacing: .05em;
+  text-align: center; padding: 14px;
+  background: var(--field-bg); border: 1px dashed var(--accent);
+  border-radius: 10px; color: var(--accent);
+  user-select: all;
+}
 
 @media print {
   .app-header, .tabs, .no-print { display: none !important; }

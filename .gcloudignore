@@ -1,0 +1,12 @@
+# Keep the Cloud Build source upload small + fast.
+.git
+node_modules
+dist
+.vite
+*.log
+.env
+.env.*
+self-host/supabase
+self-host/oci/deploy.env
+self-host/cloudrun/deploy.env
+.DS_Store

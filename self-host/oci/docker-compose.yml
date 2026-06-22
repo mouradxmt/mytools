@@ -1,0 +1,34 @@
+# Lightweight deployment for a 1 GB OCI Micro box.
+# Only the app + a Caddy reverse proxy (auto HTTPS). The Supabase backend
+# lives on hosted Supabase's free tier — see deploy.env for its URL/key.
+services:
+  mytools:
+    image: mytools:latest          # loaded from a tarball by deploy.sh (not built here)
+    container_name: mytools-app
+    environment:
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY}"
+    restart: unless-stopped
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: mytools-caddy
+    depends_on:
+      - mytools
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: "${DOMAIN}"
+      TLS_EMAIL: "${TLS_EMAIL}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

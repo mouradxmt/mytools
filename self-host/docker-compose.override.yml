@@ -1,0 +1,17 @@
+# Copied into the Supabase docker dir by init.sh, where docker compose
+# auto-merges it with the official docker-compose.yml.
+# Adds the mytools app, served by nginx, talking to the local Supabase gateway.
+services:
+  mytools:
+    container_name: mytools-app
+    build:
+      context: ../..          # repo root (relative to self-host/supabase/)
+      dockerfile: Dockerfile
+    ports:
+      - "${MYTOOLS_PORT:-3001}:8080"
+    environment:
+      SUPABASE_URL: "${MYTOOLS_SUPABASE_URL:-http://localhost:8000}"
+      SUPABASE_ANON_KEY: "${ANON_KEY}"
+    restart: unless-stopped
+    depends_on:
+      - kong

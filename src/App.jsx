@@ -14,8 +14,41 @@ const TABS = [
   { id: 'invoices', label: 'Invoices', icon: '🧾', Component: InvoicesApp }
 ];
 
+function RecoveryCodeModal() {
+  const { pendingRecoveryCode, dismissRecoveryCode } = useVault();
+  const [copied, setCopied] = useState(false);
+  if (!pendingRecoveryCode) return null;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(pendingRecoveryCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-card">
+        <h2 style={{ margin: 0 }}>🔑 Save your recovery code</h2>
+        <p className="hint">
+          Write this down somewhere safe. It is the <strong>only</strong> way to recover your
+          data if you forget your password. We cannot show it again.
+        </p>
+        <div className="recovery-code">{pendingRecoveryCode}</div>
+        <div className="toolbar" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+          <button onClick={copy}>{copied ? '✓ Copied' : 'Copy'}</button>
+          <button className="primary" onClick={dismissRecoveryCode}>
+            I saved it — continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Shell() {
-  const { unlocked, lock, autoLockMin, setAutoLockMin } = useVault();
+  const { unlocked, lock, signOut, session, authReady, autoLockMin, setAutoLockMin } = useVault();
   const [active, setActive] = useState(() => localStorage.getItem('mytools.activeTab') || 'calendar');
   const [theme, setTheme] = useState(() => localStorage.getItem('mytools.theme') || 'dark');
 
@@ -26,7 +59,18 @@ function Shell() {
 
   useEffect(() => { localStorage.setItem('mytools.activeTab', active); }, [active]);
 
-  if (!unlocked) return <LoginScreen />;
+  if (!authReady) {
+    return <div className="login-wrap"><div className="muted">Loading…</div></div>;
+  }
+
+  if (!unlocked) {
+    return (
+      <>
+        <LoginScreen />
+        <RecoveryCodeModal />
+      </>
+    );
+  }
 
   const Active = TABS.find((t) => t.id === active)?.Component || (() => null);
 
@@ -35,6 +79,9 @@ function Shell() {
       <header className="app-header">
         <h1>🛠️ mytools</h1>
         <div className="actions">
+          {session?.user?.email && (
+            <span className="pill" title="Signed in as">{session.user.email}</span>
+          )}
           <label className="pill" title="Auto-lock idle minutes">
             Lock&nbsp;
             <select
@@ -53,12 +100,14 @@ function Shell() {
             {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
           </button>
           <button className="ghost" onClick={lock}>🔒 Lock</button>
+          <button className="ghost" onClick={signOut}>↪ Sign out</button>
         </div>
       </header>
       <Tabs tabs={TABS} active={active} onChange={setActive} />
       <main className="app-main">
         <Active />
       </main>
+      <RecoveryCodeModal />
     </>
   );
 }

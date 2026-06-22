@@ -3,3 +3,14 @@ dist
 .DS_Store
 .vite
 *.log
+.env
+.env.*
+!.env.example
+# self-hosted Supabase stack (cloned by self-host/init.sh) + its generated secrets
+self-host/supabase/
+
+# OCI deploy secrets
+self-host/oci/deploy.env
+
+# Cloud Run deploy secrets
+self-host/cloudrun/deploy.env

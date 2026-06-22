@@ -1,0 +1,15 @@
+# Auto HTTPS via Let's Encrypt. {$DOMAIN} / {$TLS_EMAIL} come from compose env.
+{
+	email {$TLS_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy mytools:8080
+
+	# Don't cache the runtime config or the HTML shell
+	@nocache path /env.js /index.html /
+	header @nocache Cache-Control "no-store"
+
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+}
