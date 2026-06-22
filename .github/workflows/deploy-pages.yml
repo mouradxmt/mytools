@@ -29,13 +29,18 @@ jobs:
 
       - run: npm ci
 
-      # Project pages serve under /<repo>/; user/org pages (<owner>.github.io) under /.
+      # Base path rules:
+      #   custom domain (public/CNAME present) → /     (served at root)
+      #   user/org page (<owner>.github.io)     → /
+      #   project page                          → /<repo>/
       - name: Resolve base path
         id: base
         run: |
           repo="${GITHUB_REPOSITORY##*/}"
           owner="${GITHUB_REPOSITORY_OWNER,,}"
-          if [ "${repo,,}" = "${owner}.github.io" ]; then
+          if [ -f public/CNAME ]; then
+            echo "base=/" >> "$GITHUB_OUTPUT"
+          elif [ "${repo,,}" = "${owner}.github.io" ]; then
             echo "base=/" >> "$GITHUB_OUTPUT"
           else
             echo "base=/${repo}/" >> "$GITHUB_OUTPUT"
