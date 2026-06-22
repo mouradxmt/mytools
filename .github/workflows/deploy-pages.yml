@@ -5,7 +5,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Required for the Pages deployment to authenticate.
+# Required for the Pages deployment to authenticate
 permissions:
   contents: read
   pages: write
