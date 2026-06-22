@@ -112,7 +112,29 @@ function Shell() {
   );
 }
 
+function InsecureContextScreen() {
+  const httpsUrl = 'https://' + location.host + location.pathname;
+  return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <h1>🔒 HTTPS required</h1>
+        <p className="muted">
+          This app uses browser encryption (Web Crypto), which only works over a
+          secure connection. You’re on an insecure <code>http://</code> origin.
+        </p>
+        <a className="primary" href={httpsUrl} style={{ textAlign: 'center', padding: 12, borderRadius: 10, textDecoration: 'none' }}>
+          Open the secure version →
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  // Guard: without crypto.subtle the vault can't function (insecure context).
+  if (typeof window !== 'undefined' && !window.crypto?.subtle) {
+    return <InsecureContextScreen />;
+  }
   return (
     <VaultProvider>
       <Shell />
