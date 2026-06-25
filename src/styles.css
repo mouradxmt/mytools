@@ -78,7 +78,9 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
   border-bottom: 1px solid var(--border);
 }
 .app-header h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: .3px; }
-.app-header .actions { display: flex; gap: 8px; align-items: center; }
+.app-header .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.app-header .pill.email { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-toggle { display: none; font-size: 18px; line-height: 1; padding: 8px 12px; }
 
 .tabs {
   display: flex; gap: 4px; padding: 0 16px; overflow-x: auto;
@@ -284,6 +286,12 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 .cv-controls { position: sticky; top: 80px; }
 .cv-controls label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .cv-controls select { width: 100%; }
+.sync-box { border-left: 3px solid var(--border); }
+.sync-box.dirty { border-left-color: var(--warn); }
+.sync-box.clean { border-left-color: var(--ok); }
+.sync-status { display: flex; align-items: center; gap: 8px; }
+.sync-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); flex: none; }
+.sync-box.dirty .sync-dot { background: var(--warn); }
 .cv-canvas { overflow: auto; }
 
 /* Always a white "paper", independent of app theme */
@@ -295,11 +303,12 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
   padding: 14mm; border-radius: 2px;                  /* margins match @page */
   font-family: Georgia, 'Times New Roman', serif; line-height: 1.5;
 }
-/* Fit the A4 sheet on narrow screens without changing its proportions */
-@media (max-width: 840px) {
-  .cv-canvas { display: flex; justify-content: center; }
-  .cv-paper { transform: scale(.62); transform-origin: top center; }
-}
+/* Fit the A4 sheet on narrow screens. `zoom` shrinks the layout box too
+   (unlike transform), so there's no overflow/empty space. Screen-only → print
+   keeps full A4. */
+@media screen and (max-width: 860px) { .cv-paper { zoom: .68; } }
+@media screen and (max-width: 560px) { .cv-paper { zoom: .46; } }
+@media screen and (max-width: 400px) { .cv-paper { zoom: .4; } }
 .cv-paper a { color: #1a4d8f; text-decoration: none; }
 .cv-head h1 { margin: 0; font-size: 28px; letter-spacing: .5px; }
 .cv-title { font-size: 15px; color: #444; margin-top: 2px; font-weight: 600; }
@@ -353,6 +362,39 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 .density-ultra .cv-exp-tags { margin-top: 2px; }
 .density-ultra .cv-tag { font-size: 9px; padding: 0 6px; }
 .density-ultra .cv-skill { font-size: 10px; padding: 1px 7px; }
+
+/* ── Mobile ─────────────────────────────────────────────────────────── */
+@media screen and (max-width: 720px) {
+  .app-main { padding: 12px; }
+
+  /* Header actions collapse into a dropdown behind the ☰ button */
+  .app-header { position: relative; padding: 12px; }
+  .menu-toggle { display: inline-flex; align-items: center; }
+  .app-header .actions {
+    display: none;
+    position: absolute; top: calc(100% - 2px); right: 8px;
+    flex-direction: column; align-items: stretch; gap: 6px;
+    min-width: 210px; padding: 10px; z-index: 40;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, .4);
+  }
+  .app-header .actions.open { display: flex; }
+  .app-header .actions .pill,
+  .app-header .actions button { width: 100%; justify-content: flex-start; text-align: left; }
+  .app-header .actions .pill { display: flex; align-items: center; }
+  .app-header .pill.email { max-width: none; }
+
+  /* Tabs: comfortable horizontal scroll, hidden scrollbar */
+  .tabs { padding: 0 8px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 11px 12px; }
+
+  /* Resume: sidebar stacks above the sheet, not sticky */
+  .cv-controls { position: static; }
+
+  /* Drawers go full-width */
+  .drawer, .drawer.wide { width: 100%; }
+}
 
 @media print {
   .app-header, .tabs, .no-print { display: none !important; }

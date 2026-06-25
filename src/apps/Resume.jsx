@@ -30,10 +30,20 @@ const blankExp = () => ({ id: null, client: '', role: '', location: '', start: '
 const blankEdu = () => ({ id: null, degree: '', school: '', location: '', start: '', end: '' });
 
 export default function ResumeApp() {
-  const [profile, setProfile] = useEncryptedState('resume/profile', blankProfile());
-  const [experiences, setExperiences] = useEncryptedState('resume/experiences', []);
-  const [education, setEducation] = useEncryptedState('resume/education', []);
-  const [skills, setSkills] = useEncryptedState('knowledge/skills', []);
+  // Local-first: résumé edits are saved on this device and pushed to the
+  // server only when you click "Sync" (autoPush: false).
+  const LOCAL = { autoPush: false };
+  const [profile, setProfile, , profileSync] = useEncryptedState('resume/profile', blankProfile(), LOCAL);
+  const [experiences, setExperiences, , expSync] = useEncryptedState('resume/experiences', [], LOCAL);
+  const [education, setEducation, , eduSync] = useEncryptedState('resume/education', [], LOCAL);
+  const [skills, setSkills, , skillsSync] = useEncryptedState('knowledge/skills', [], LOCAL);
+
+  const syncParts = [profileSync, expSync, eduSync, skillsSync];
+  const isDirty = syncParts.some((s) => s.dirty);
+  const isSyncing = syncParts.some((s) => s.syncing);
+  const syncError = syncParts.map((s) => s.error).find(Boolean) || '';
+  const lastSavedAt = syncParts.map((s) => s.savedAt).filter(Boolean).sort().slice(-1)[0] || null;
+  const syncAll = () => Promise.all(syncParts.map((s) => s.pushNow()));
 
   // Import / export
   const [importMsg, setImportMsg] = useState('');
@@ -171,6 +181,27 @@ export default function ResumeApp() {
     <div className="cv-layout">
       {/* ── Control panel sidebar ── */}
       <aside className="cv-controls no-print">
+        <div className={'card sync-box ' + (isDirty ? 'dirty' : 'clean')}><div className="content">
+          <div className="sync-status">
+            <span className="sync-dot" />
+            <strong>{isDirty ? 'Saved on this device only' : 'Synced to server'}</strong>
+          </div>
+          <div className="hint" style={{ marginTop: 4 }}>
+            {isDirty
+              ? 'Your résumé changes are stored locally and are not on the server yet. Push them so they’re backed up and available on your other devices (and the live site).'
+              : lastSavedAt
+                ? `All changes are on the server (last sync ${new Date(lastSavedAt).toLocaleString()}).`
+                : 'No server copy yet — push to back up your résumé.'}
+          </div>
+          <button
+            className="primary" style={{ width: '100%', marginTop: 8 }}
+            onClick={syncAll} disabled={isSyncing || (!isDirty && !!lastSavedAt)}
+          >
+            {isSyncing ? 'Syncing…' : isDirty ? '☁ Sync to server now' : '✓ Up to date'}
+          </button>
+          {syncError && <div className="err" style={{ marginTop: 6 }}>Sync failed: {syncError}</div>}
+        </div></div>
+
         <div className="card"><div className="content">
           <button className="primary" style={{ width: '100%' }} onClick={() => window.print()}>🖨 Export PDF</button>
           <div className="hint" style={{ marginTop: 6 }}>Uses your browser’s “Save as PDF”. Only the page below prints.</div>

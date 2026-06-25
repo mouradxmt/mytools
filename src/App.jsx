@@ -51,10 +51,74 @@ function RecoveryCodeModal() {
   );
 }
 
+function ChangePasswordModal({ onClose }) {
+  const { changePassword } = useVault();
+  const [cur, setCur] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [done, setDone] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setErr('');
+    if (next.length < 8) { setErr('New password must be at least 8 characters.'); return; }
+    if (next !== confirm) { setErr('New passwords do not match.'); return; }
+    if (next === cur) { setErr('New password must differ from the current one.'); return; }
+    setBusy(true);
+    try {
+      await changePassword(cur, next);
+      setDone(true);
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <form className="modal-card" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+        <h2 style={{ margin: 0 }}>🔑 Change password</h2>
+        {done ? (
+          <>
+            <p className="hint" style={{ color: 'var(--ok)' }}>
+              Password changed. Your old password no longer works — for sign-in or decryption —
+              so anywhere it was exposed is now harmless.
+            </p>
+            <button type="button" className="primary" onClick={onClose}>Done</button>
+          </>
+        ) : (
+          <>
+            <p className="hint">
+              Re-encrypts your vault key under a new password and updates your sign-in.
+              Your data is preserved and your recovery code stays valid.
+            </p>
+            <input type="password" autoComplete="current-password" placeholder="Current password"
+              value={cur} onChange={(e) => setCur(e.target.value)} required autoFocus />
+            <input type="password" autoComplete="new-password" placeholder="New password (min 8 chars)"
+              value={next} onChange={(e) => setNext(e.target.value)} required minLength={8} />
+            <input type="password" autoComplete="new-password" placeholder="Confirm new password"
+              value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={8} />
+            {err && <div className="err">{err}</div>}
+            <div className="toolbar" style={{ justifyContent: 'flex-end' }}>
+              <button type="button" onClick={onClose} disabled={busy}>Cancel</button>
+              <button type="submit" className="primary" disabled={busy}>{busy ? 'Changing…' : 'Change password'}</button>
+            </div>
+          </>
+        )}
+      </form>
+    </div>
+  );
+}
+
 function Shell() {
   const { unlocked, lock, signOut, session, authReady, autoLockMin, setAutoLockMin } = useVault();
   const [active, setActive] = useState(() => localStorage.getItem('mytools.activeTab') || 'calendar');
   const [theme, setTheme] = useState(() => localStorage.getItem('mytools.theme') || 'dark');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showChangePw, setShowChangePw] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -82,9 +146,14 @@ function Shell() {
     <>
       <header className="app-header">
         <h1>🛠️ mytools</h1>
-        <div className="actions">
+        <button
+          className="menu-toggle"
+          aria-label="Menu" aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((o) => !o)}
+        >☰</button>
+        <div className={'actions' + (menuOpen ? ' open' : '')}>
           {session?.user?.email && (
-            <span className="pill" title="Signed in as">{session.user.email}</span>
+            <span className="pill email" title="Signed in as">{session.user.email}</span>
           )}
           <label className="pill" title="Auto-lock idle minutes">
             Lock&nbsp;
@@ -100,18 +169,20 @@ function Shell() {
               <option value={0}>Off</option>
             </select>
           </label>
-          <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+          <button onClick={() => { setTheme(theme === 'dark' ? 'light' : 'dark'); setMenuOpen(false); }}>
             {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
           </button>
-          <button className="ghost" onClick={lock}>🔒 Lock</button>
-          <button className="ghost" onClick={signOut}>↪ Sign out</button>
+          <button className="ghost" onClick={() => { setMenuOpen(false); setShowChangePw(true); }}>🔑 Password</button>
+          <button className="ghost" onClick={() => { setMenuOpen(false); lock(); }}>🔒 Lock</button>
+          <button className="ghost" onClick={() => { setMenuOpen(false); signOut(); }}>↪ Sign out</button>
         </div>
       </header>
-      <Tabs tabs={TABS} active={active} onChange={setActive} />
+      <Tabs tabs={TABS} active={active} onChange={(id) => { setActive(id); setMenuOpen(false); }} />
       <main className="app-main">
         <Active />
       </main>
       <RecoveryCodeModal />
+      {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
     </>
   );
 }
