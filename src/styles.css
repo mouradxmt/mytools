@@ -213,6 +213,30 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 .dot.wknd { background: var(--wknd); border: 1px solid var(--grid); }
 .dot.holiday { background: transparent; border: 2px dashed var(--danger); }
 .dot.vacation { background: rgba(79, 209, 197, .30); }
+.dot.office { background: var(--accent); }
+
+/* Rotation overlay badge inside calendar cells */
+.calendar .badge.rot {
+  border: 1px solid var(--accent-border); color: var(--accent);
+  background: var(--accent-2); display: inline-flex; align-items: center; gap: 3px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.calendar .badge.rot.mine {
+  background: var(--accent-grad); color: var(--accent-contrast);
+  border-color: transparent; font-weight: 600;
+}
+
+/* Segmented Month / Rotation switch */
+.seg-toggle {
+  display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 16px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+}
+.seg-toggle button {
+  background: transparent; border: 0; border-radius: 8px;
+  padding: 8px 16px; color: var(--muted); font-weight: 500;
+}
+.seg-toggle button:hover { color: var(--text); }
+.seg-toggle button.active { background: var(--accent-grad); color: var(--accent-contrast); }
 @media (max-width: 980px) { .calendar td { height: 76px; } }
 
 /* Remote rotation */

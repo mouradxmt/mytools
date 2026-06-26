@@ -2,16 +2,14 @@ import { useEffect, useState } from 'react';
 import { VaultProvider, useVault } from './vault/VaultContext.jsx';
 import LoginScreen from './vault/LoginScreen.jsx';
 import Tabs from './components/Tabs.jsx';
-import CalendarApp from './apps/Calendar.jsx';
-import RemoteRotationApp from './apps/RemoteRotation.jsx';
+import ScheduleApp from './apps/Schedule.jsx';
 import TasksApp from './apps/Tasks.jsx';
 import InvoicesApp from './apps/Invoices.jsx';
 import KnowledgeApp from './apps/Knowledge.jsx';
 import ResumeApp from './apps/Resume.jsx';
 
 const TABS = [
-  { id: 'calendar', label: 'Calendar', icon: '📅', Component: CalendarApp },
-  { id: 'remote', label: 'Remote Rotation', icon: '🗓️', Component: RemoteRotationApp },
+  { id: 'calendar', label: 'Calendar', icon: '📅', Component: ScheduleApp },
   { id: 'tasks', label: 'Tasks', icon: '✅', Component: TasksApp },
   { id: 'knowledge', label: 'Knowledge', icon: '🧠', Component: KnowledgeApp },
   { id: 'resume', label: 'Resume', icon: '📄', Component: ResumeApp },
@@ -140,7 +138,8 @@ function Shell() {
     );
   }
 
-  const Active = TABS.find((t) => t.id === active)?.Component || (() => null);
+  const activeTab = TABS.find((t) => t.id === active) || TABS[0];
+  const Active = activeTab.Component;
 
   return (
     <>
@@ -177,7 +176,7 @@ function Shell() {
           <button className="ghost" onClick={() => { setMenuOpen(false); signOut(); }}>↪ Sign out</button>
         </div>
       </header>
-      <Tabs tabs={TABS} active={active} onChange={(id) => { setActive(id); setMenuOpen(false); }} />
+      <Tabs tabs={TABS} active={activeTab.id} onChange={(id) => { setActive(id); setMenuOpen(false); }} />
       <main className="app-main">
         <Active />
       </main>

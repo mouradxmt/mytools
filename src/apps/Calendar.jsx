@@ -24,7 +24,7 @@ const todayInfo = () => {
   return { y: t.getFullYear(), m: t.getMonth(), d: t.getDate() };
 };
 
-export default function CalendarApp() {
+export default function CalendarApp({ rotationForDate = null } = {}) {
   const init = todayInfo();
   const [ui, setUi, uiLoaded] = useEncryptedState('calendar/ui', { year: init.y, month: init.m, tjm: 0 });
   const [yearState, setYearState, yearLoaded] = useEncryptedState(
@@ -216,6 +216,7 @@ export default function CalendarApp() {
             <span><span className="dot wknd"></span> Weekend</span>
             <span><span className="dot holiday"></span> Public Holiday</span>
             <span><span className="dot vacation"></span> Vacation</span>
+            {rotationForDate && <span><span className="dot office"></span> Office rotation</span>}
           </div>
           <table className="calendar">
             <thead>
@@ -231,11 +232,17 @@ export default function CalendarApp() {
                     const isHol = activeHolidays.has(iso);
                     const isVac = vacationsForMonth.has(iso);
                     const cls = `${wknd ? 'wknd' : ''} ${isHol && isVac ? 'both' : (isHol ? 'holiday' : (isVac ? 'vacation' : ''))}`.trim();
+                    const rot = rotationForDate ? rotationForDate(cell.date) : null;
                     return (
                       <td key={ci} className={cls}>
                         <div className="date">{cell.day}</div>
                         {isHol && <div className="badge" style={{ border: '1px solid var(--danger)' }}>Holiday</div>}
                         {isVac && <div className="badge" style={{ border: '1px solid var(--accent)' }}>Vacation</div>}
+                        {rot && (
+                          <div className={'badge rot' + (rot.isMine ? ' mine' : '')} title={rot.names.join(', ')}>
+                            🏢 {rot.isMine ? 'You' : rot.names.join(', ')}
+                          </div>
+                        )}
                       </td>
                     );
                   })}
