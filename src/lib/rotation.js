@@ -39,6 +39,10 @@ export function makeRotationLookup(cfg, meName) {
     const norm = (idx) => ((idx + (shift % len) + len) % len);
     const names = n.people.filter((p) => norm(p.startDayIndex) === ci).map((p) => p.name);
     if (!names.length) return null;
-    return { names, isMine: meName ? names.includes(meName) : false };
+    const isMine = meName ? names.includes(meName) : false;
+    // Show everyone assigned that day; render your own name as "You" (first).
+    const display = names.map((nm) => (meName && nm === meName ? 'You' : nm));
+    if (isMine) display.sort((a, b) => (a === 'You' ? -1 : b === 'You' ? 1 : 0));
+    return { names, isMine, display };
   };
 }

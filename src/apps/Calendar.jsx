@@ -251,7 +251,7 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
                         {isVac && <div className="badge vac" title="Vacation">🏖️ Vacation</div>}
                         {rot && (
                           <div className={'badge rot' + (rot.isMine ? ' mine' : '')} title={'Office: ' + rot.names.join(', ')}>
-                            🏢 {rot.isMine ? 'You' : rot.names.join(', ')}
+                            🏢 {rot.display.join(', ')}
                           </div>
                         )}
                       </td>
