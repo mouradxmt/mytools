@@ -26,7 +26,7 @@ const DENSITIES = [
 ];
 
 const blankProfile = () => ({ name: '', title: '', summary: '', email: '', phone: '', location: '', linksText: '' });
-const blankExp = () => ({ id: null, client: '', role: '', location: '', start: '', end: '', tagsText: '', bulletsText: '' });
+const blankExp = () => ({ id: null, client: '', role: '', location: '', start: '', end: '', tagsText: '', bullets: [''] });
 const blankEdu = () => ({ id: null, degree: '', school: '', location: '', start: '', end: '' });
 
 export default function ResumeApp() {
@@ -143,14 +143,16 @@ export default function ResumeApp() {
   // ── Experience CRUD ─────────────────────────────────────────────────
   const editExp = (e) => setExpDraft({
     id: e.id, client: e.client, role: e.role, location: e.location || '',
-    start: e.start || '', end: e.end || '', tagsText: (e.tags || []).join(', '), bulletsText: (e.bullets || []).join('\n')
+    start: e.start || '', end: e.end || '', tagsText: (e.tags || []).join(', '),
+    bullets: (e.bullets && e.bullets.length) ? [...e.bullets] : ['']
   });
   const saveExp = (ev) => {
     ev.preventDefault();
     if (!expDraft.client.trim() && !expDraft.role.trim()) return;
     const rec = {
       client: expDraft.client.trim(), role: expDraft.role.trim(), location: expDraft.location.trim(),
-      start: expDraft.start, end: expDraft.end, tags: parseTags(expDraft.tagsText), bullets: parseLines(expDraft.bulletsText)
+      start: expDraft.start, end: expDraft.end, tags: parseTags(expDraft.tagsText),
+      bullets: expDraft.bullets.map((b) => b.trim()).filter(Boolean)
     };
     if (expDraft.id) setExperiences(experiences.map((e) => e.id === expDraft.id ? { ...e, ...rec } : e));
     else setExperiences([...experiences, { id: newId(), ...rec }]);
@@ -319,9 +321,9 @@ export default function ResumeApp() {
       {showEditor && (
         <div className="drawer-backdrop no-print" onClick={() => { setShowEditor(false); setExpDraft(null); }}>
           <div className="drawer wide" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ marginTop: 0 }}>CV data</h2>
+            <h2 style={{ marginTop: 0 }}>📄 CV data</h2>
 
-            <h3>Import / export</h3>
+            <h3 className="editor-head">🗂️ Import / export</h3>
             <div className="toolbar">
               <label className="filebtn">
                 Import JSON file
@@ -353,7 +355,7 @@ export default function ResumeApp() {
             <div className="hint" style={{ marginTop: 4 }}>Importing replaces your current profile, experience and education (and skills, if the file has them).</div>
 
             <hr />
-            <h3>Profile</h3>
+            <h3 className="editor-head">👤 Profile</h3>
             <div className="toolbar">
               <label style={{ flex: 1 }}>Name<input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} /></label>
               <label style={{ flex: 1 }}>Title<input value={profile.title} onChange={(e) => setProfile({ ...profile, title: e.target.value })} /></label>
@@ -370,88 +372,177 @@ export default function ResumeApp() {
 
             <hr />
             <div className="toolbar" style={{ justifyContent: 'space-between' }}>
-              <h3 style={{ margin: 0 }}>Experience</h3>
-              <button className="primary" onClick={() => setExpDraft(blankExp())}>＋ Add</button>
+              <h3 className="editor-head" style={{ margin: 0 }}>💼 Experience</h3>
+              <button className="primary" onClick={() => setExpDraft(blankExp())} disabled={!!expDraft}>＋ Add experience</button>
             </div>
-            <div className="list" style={{ marginTop: 8 }}>
+            <div className="exp-list">
+              {/* New entry form (added at the top) */}
+              {expDraft && expDraft.id === null && (
+                <div className="exp-card editing">
+                  <ExperienceForm draft={expDraft} setDraft={setExpDraft} onSave={saveExp} onCancel={() => setExpDraft(null)} isNew />
+                </div>
+              )}
               {experiences.map((e) => (
-                <div className="row" key={e.id}>
-                  <div><strong>{e.role || 'Role'}</strong>{e.client ? ` — ${e.client}` : ''}<br /><small>{fmtMonth(e.start)} – {fmtMonth(e.end)}</small></div>
-                  <div className="actions">
-                    <button onClick={() => editExp(e)}>Edit</button>
-                    <button className="ghost" onClick={() => removeExp(e.id)}>Delete</button>
+                expDraft && expDraft.id === e.id ? (
+                  <div className="exp-card editing" key={e.id}>
+                    <ExperienceForm draft={expDraft} setDraft={setExpDraft} onSave={saveExp} onCancel={() => setExpDraft(null)} />
                   </div>
-                </div>
+                ) : (
+                  <div className="exp-card" key={e.id}>
+                    <div className="exp-card-head">
+                      <div>
+                        <strong>💼 {e.role || 'Untitled role'}</strong>{e.client ? ` — ${e.client}` : ''}
+                        <div className="hint">
+                          {fmtMonth(e.start)} – {fmtMonth(e.end)}{e.location ? ` · ${e.location}` : ''} · {(e.bullets || []).length} bullet{(e.bullets || []).length === 1 ? '' : 's'}
+                        </div>
+                      </div>
+                      <div className="actions">
+                        <button onClick={() => editExp(e)} disabled={!!expDraft}>✎ Edit</button>
+                        <button className="ghost" onClick={() => removeExp(e.id)} disabled={!!expDraft}>🗑</button>
+                      </div>
+                    </div>
+                  </div>
+                )
               ))}
-              {experiences.length === 0 && <div className="hint">No entries yet.</div>}
+              {experiences.length === 0 && !expDraft && <div className="hint">No experience yet — click “Add experience”.</div>}
             </div>
-
-            {expDraft && (
-              <form onSubmit={saveExp} style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                <div className="toolbar">
-                  <label style={{ flex: 1 }}>Role<input value={expDraft.role} onChange={(e) => setExpDraft({ ...expDraft, role: e.target.value })} /></label>
-                  <label style={{ flex: 1 }}>Client / company<input value={expDraft.client} onChange={(e) => setExpDraft({ ...expDraft, client: e.target.value })} /></label>
-                </div>
-                <div className="toolbar">
-                  <label>Start<input type="month" value={expDraft.start} onChange={(e) => setExpDraft({ ...expDraft, start: e.target.value })} /></label>
-                  <label>End <small className="hint">(blank = Present)</small><input type="month" value={expDraft.end} onChange={(e) => setExpDraft({ ...expDraft, end: e.target.value })} /></label>
-                  <label style={{ flex: 1 }}>Location<input value={expDraft.location} onChange={(e) => setExpDraft({ ...expDraft, location: e.target.value })} /></label>
-                </div>
-                <label>Tech tags (comma-separated)
-                  <input value={expDraft.tagsText} onChange={(e) => setExpDraft({ ...expDraft, tagsText: e.target.value })} placeholder="kubernetes, argocd, terraform" />
-                </label>
-                <label>Bullet points (one per line)
-                  <textarea rows={5} value={expDraft.bulletsText} onChange={(e) => setExpDraft({ ...expDraft, bulletsText: e.target.value })} />
-                </label>
-                <div className="toolbar" style={{ justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => setExpDraft(null)}>Cancel</button>
-                  <button type="submit" className="primary">{expDraft.id ? 'Save' : 'Add'}</button>
-                </div>
-              </form>
-            )}
 
             <hr />
             <div className="toolbar" style={{ justifyContent: 'space-between' }}>
-              <h3 style={{ margin: 0 }}>Education</h3>
-              <button className="primary" onClick={() => setEduDraft(blankEdu())}>＋ Add</button>
+              <h3 className="editor-head" style={{ margin: 0 }}>🎓 Education</h3>
+              <button className="primary" onClick={() => setEduDraft(blankEdu())} disabled={!!eduDraft}>＋ Add education</button>
             </div>
-            <div className="list" style={{ marginTop: 8 }}>
+            <div className="exp-list">
+              {eduDraft && eduDraft.id === null && (
+                <div className="exp-card editing">
+                  <EducationForm draft={eduDraft} setDraft={setEduDraft} onSave={saveEdu} onCancel={() => setEduDraft(null)} isNew />
+                </div>
+              )}
               {education.map((e) => (
-                <div className="row" key={e.id}>
-                  <div><strong>{e.degree || 'Degree'}</strong>{e.school ? ` — ${e.school}` : ''}<br /><small>{fmtMonth(e.start)} – {fmtMonth(e.end)}</small></div>
-                  <div className="actions">
-                    <button onClick={() => editEdu(e)}>Edit</button>
-                    <button className="ghost" onClick={() => removeEdu(e.id)}>Delete</button>
+                eduDraft && eduDraft.id === e.id ? (
+                  <div className="exp-card editing" key={e.id}>
+                    <EducationForm draft={eduDraft} setDraft={setEduDraft} onSave={saveEdu} onCancel={() => setEduDraft(null)} />
                   </div>
-                </div>
+                ) : (
+                  <div className="exp-card" key={e.id}>
+                    <div className="exp-card-head">
+                      <div>
+                        <strong>🎓 {e.degree || 'Degree'}</strong>{e.school ? ` — ${e.school}` : ''}
+                        <div className="hint">{fmtMonth(e.start)} – {fmtMonth(e.end)}{e.location ? ` · ${e.location}` : ''}</div>
+                      </div>
+                      <div className="actions">
+                        <button onClick={() => editEdu(e)} disabled={!!eduDraft}>✎ Edit</button>
+                        <button className="ghost" onClick={() => removeEdu(e.id)} disabled={!!eduDraft}>🗑</button>
+                      </div>
+                    </div>
+                  </div>
+                )
               ))}
-              {education.length === 0 && <div className="hint">No education entries yet.</div>}
+              {education.length === 0 && !eduDraft && <div className="hint">No education yet — click “Add education”.</div>}
             </div>
-            {eduDraft && (
-              <form onSubmit={saveEdu} style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                <div className="toolbar">
-                  <label style={{ flex: 1 }}>Degree<input value={eduDraft.degree} onChange={(e) => setEduDraft({ ...eduDraft, degree: e.target.value })} /></label>
-                  <label style={{ flex: 1 }}>School<input value={eduDraft.school} onChange={(e) => setEduDraft({ ...eduDraft, school: e.target.value })} /></label>
-                </div>
-                <div className="toolbar">
-                  <label>Start<input type="month" value={eduDraft.start} onChange={(e) => setEduDraft({ ...eduDraft, start: e.target.value })} /></label>
-                  <label>End<input type="month" value={eduDraft.end} onChange={(e) => setEduDraft({ ...eduDraft, end: e.target.value })} /></label>
-                  <label style={{ flex: 1 }}>Location<input value={eduDraft.location} onChange={(e) => setEduDraft({ ...eduDraft, location: e.target.value })} /></label>
-                </div>
-                <div className="toolbar" style={{ justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => setEduDraft(null)}>Cancel</button>
-                  <button type="submit" className="primary">{eduDraft.id ? 'Save' : 'Add'}</button>
-                </div>
-              </form>
-            )}
 
-            <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
-              <button onClick={() => { setShowEditor(false); setExpDraft(null); setEduDraft(null); }}>Done</button>
+            <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
+              <button className="primary" onClick={() => { setShowEditor(false); setExpDraft(null); setEduDraft(null); }}>✓ Done</button>
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function ExperienceForm({ draft, setDraft, onSave, onCancel, isNew }) {
+  const setField = (k, v) => setDraft({ ...draft, [k]: v });
+  const setBullet = (i, v) => setDraft({ ...draft, bullets: draft.bullets.map((b, idx) => (idx === i ? v : b)) });
+  const addBullet = () => setDraft({ ...draft, bullets: [...draft.bullets, ''] });
+  const removeBullet = (i) => setDraft({ ...draft, bullets: draft.bullets.filter((_, idx) => idx !== i) });
+  const moveBullet = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= draft.bullets.length) return;
+    const b = [...draft.bullets];
+    [b[i], b[j]] = [b[j], b[i]];
+    setDraft({ ...draft, bullets: b });
+  };
+
+  return (
+    <form className="exp-edit" onSubmit={onSave}>
+      <div className="exp-edit-title">{isNew ? 'New experience' : 'Editing experience'}</div>
+      <div className="field-grid">
+        <label>Role / title
+          <input value={draft.role} autoFocus onChange={(e) => setField('role', e.target.value)} placeholder="DevOps Consultant" />
+        </label>
+        <label>Client / company
+          <input value={draft.client} onChange={(e) => setField('client', e.target.value)} placeholder="TEC" />
+        </label>
+        <label>Start
+          <input type="month" value={draft.start} onChange={(e) => setField('start', e.target.value)} />
+        </label>
+        <label>End <span className="hint">(blank = Present)</span>
+          <input type="month" value={draft.end} onChange={(e) => setField('end', e.target.value)} />
+        </label>
+        <label className="span2">Location
+          <input value={draft.location} onChange={(e) => setField('location', e.target.value)} placeholder="Germany" />
+        </label>
+        <label className="span2">Tech tags <span className="hint">(comma-separated)</span>
+          <input value={draft.tagsText} onChange={(e) => setField('tagsText', e.target.value)} placeholder="kubernetes, argocd, terraform" />
+        </label>
+      </div>
+
+      <div className="bullets-head">
+        <strong>Bullet points</strong>
+        <button type="button" onClick={addBullet}>＋ Add bullet</button>
+      </div>
+      {draft.bullets.length === 0 && <div className="hint">No bullets yet — add achievements, one per bullet.</div>}
+      {draft.bullets.map((b, i) => (
+        <div className="bullet-row" key={i}>
+          <span className="bullet-dot">•</span>
+          <textarea
+            rows={2} value={b} placeholder="Describe an achievement or responsibility…"
+            onChange={(e) => setBullet(i, e.target.value)}
+          />
+          <div className="bullet-actions">
+            <button type="button" title="Move up" onClick={() => moveBullet(i, -1)} disabled={i === 0}>↑</button>
+            <button type="button" title="Move down" onClick={() => moveBullet(i, 1)} disabled={i === draft.bullets.length - 1}>↓</button>
+            <button type="button" className="ghost" title="Remove bullet" onClick={() => removeBullet(i)}>✕</button>
+          </div>
+        </div>
+      ))}
+
+      <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
+        <button type="button" onClick={onCancel}>Cancel</button>
+        <button type="submit" className="primary">{isNew ? 'Add experience' : 'Save changes'}</button>
+      </div>
+    </form>
+  );
+}
+
+function EducationForm({ draft, setDraft, onSave, onCancel, isNew }) {
+  const setField = (k, v) => setDraft({ ...draft, [k]: v });
+  return (
+    <form className="exp-edit" onSubmit={onSave}>
+      <div className="exp-edit-title">{isNew ? '🎓 New education' : '🎓 Editing education'}</div>
+      <div className="field-grid">
+        <label className="span2">Degree / programme
+          <input value={draft.degree} autoFocus onChange={(e) => setField('degree', e.target.value)} placeholder="Engineering Cycle in Computer Engineering" />
+        </label>
+        <label className="span2">School
+          <input value={draft.school} onChange={(e) => setField('school', e.target.value)} placeholder="ENSA Fès" />
+        </label>
+        <label>Start
+          <input type="month" value={draft.start} onChange={(e) => setField('start', e.target.value)} />
+        </label>
+        <label>End
+          <input type="month" value={draft.end} onChange={(e) => setField('end', e.target.value)} />
+        </label>
+        <label className="span2">Location
+          <input value={draft.location} onChange={(e) => setField('location', e.target.value)} placeholder="Fès, Morocco" />
+        </label>
+      </div>
+      <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
+        <button type="button" onClick={onCancel}>Cancel</button>
+        <button type="submit" className="primary">{isNew ? 'Add education' : 'Save changes'}</button>
+      </div>
+    </form>
   );
 }
 
