@@ -33,8 +33,11 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
   );
 
   const [apiHolidays, setApiHolidays] = useState({});
-  const [holidayInputs, setHolidayInputs] = useState({ date: '', name: '' });
-  const [vacInputs, setVacInputs] = useState({ start: '', end: '', title: '' });
+  // Click-a-day editor
+  const [dayModal, setDayModal] = useState(null);   // ISO date string or null
+  const [dayHolName, setDayHolName] = useState('');
+  const [dayVacEnd, setDayVacEnd] = useState('');
+  const [dayVacTitle, setDayVacTitle] = useState('');
 
   // Fetch holidays whenever year changes & overrides ready
   const lastFetchYear = useRef(null);
@@ -118,6 +121,12 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
   } else if (ui.year === today.getFullYear() && ui.month === today.getMonth()) {
     elapsed = calcWorkingDays(ui.year, ui.month, 1, today.getDate()).working;
   }
+  const todayISO = fmtDate(today);
+  const shiftMonth = (delta) => {
+    let m = ui.month + delta, y = ui.year;
+    if (m < 0) { m = 11; y -= 1; } else if (m > 11) { m = 0; y += 1; }
+    setUi({ ...ui, year: y, month: m });
+  };
 
   // ── Calendar grid ────────────────────────────────────────────────
   const weeks = useMemo(() => {
@@ -159,25 +168,20 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
       return { ...s, customHolidays: c };
     });
   };
-  const addCustomHoliday = (e) => {
-    e.preventDefault();
-    const { date, name } = holidayInputs;
-    if (!date || !name.trim()) return;
-    setYearState((s) => ({ ...s, customHolidays: { ...s.customHolidays, [date]: { name: name.trim(), enabled: true } } }));
-    setHolidayInputs({ date: '', name: '' });
+  const openDay = (iso) => { setDayModal(iso); setDayHolName(''); setDayVacEnd(iso); setDayVacTitle(''); };
+  const addCustomHolidayFor = (date, name) => {
+    setYearState((s) => ({ ...s, customHolidays: { ...s.customHolidays, [date]: { name: (name || 'Holiday').trim(), enabled: true } } }));
   };
   const resetHolidays = () => {
     setYearState((s) => ({ ...s, customHolidays: {}, apiOverrides: {} }));
     lastFetchYear.current = null; // force refetch
   };
-  const addVacation = (e) => {
-    e.preventDefault();
-    const { start, end, title } = vacInputs;
-    if (!start || !end) return;
-    if (end < start) { alert('End date must be after start date'); return; }
+  const addVacationRange = (start, end, title) => {
+    if (!start) return;
+    if (!end) end = start;
+    if (end < start) { const t = start; start = end; end = t; }
     const id = (crypto.randomUUID && crypto.randomUUID()) || Math.random().toString(36).slice(2);
-    setYearState((s) => ({ ...s, vacations: [...s.vacations, { id, start, end, title: title.trim() }] }));
-    setVacInputs({ start: '', end: '', title: '' });
+    setYearState((s) => ({ ...s, vacations: [...s.vacations, { id, start, end, title: (title || '').trim() }] }));
   };
   const removeVacation = (id) => {
     setYearState((s) => ({ ...s, vacations: s.vacations.filter((v) => v.id !== id) }));
@@ -200,23 +204,28 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
         <h2>Calendar</h2>
         <div className="content">
           <div className="toolbar" style={{ marginBottom: 10 }}>
+            <button className="nav-btn" onClick={() => shiftMonth(-1)} aria-label="Previous month" title="Previous month">‹</button>
             <select value={ui.month} onChange={(e) => setUi({ ...ui, month: Number(e.target.value) })}>
               {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
             </select>
             <select value={ui.year} onChange={(e) => setUi({ ...ui, year: Number(e.target.value) })}>
               {range(init.y - 3, init.y + 3).map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
+            <button className="nav-btn" onClick={() => shiftMonth(1)} aria-label="Next month" title="Next month">›</button>
             <button onClick={() => setUi({ ...ui, year: init.y, month: init.m })}>Today</button>
-            <span className="pill">
-              Working Days: {monthStats.working} (weekend {monthStats.weekend}, holidays {monthStats.holidays}, vacations {monthStats.vacations})
-            </span>
+          </div>
+          <div className="cal-summary" style={{ marginBottom: 10 }}>
+            <span className="chip strong">🗓️ {monthStats.working} working days</span>
+            <span className="chip">🛌 {monthStats.weekend} weekend</span>
+            <span className="chip">🎉 {monthStats.holidays} holiday{monthStats.holidays === 1 ? '' : 's'}</span>
+            <span className="chip">🏖️ {monthStats.vacations} vacation{monthStats.vacations === 1 ? '' : 's'}</span>
           </div>
           <div className="legend" style={{ marginBottom: 10 }}>
-            <span className="chip">Week starts on Monday</span>
             <span><span className="dot wknd"></span> Weekend</span>
-            <span><span className="dot holiday"></span> Public Holiday</span>
+            <span><span className="dot holiday"></span> Holiday</span>
             <span><span className="dot vacation"></span> Vacation</span>
-            {rotationForDate && <span><span className="dot office"></span> Office rotation</span>}
+            {rotationForDate && <span><span className="dot office"></span> Office day</span>}
+            <span className="hint">💡 Click any day to add a holiday or vacation</span>
           </div>
           <table className="calendar">
             <thead>
@@ -233,13 +242,15 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
                     const isVac = vacationsForMonth.has(iso);
                     const cls = `${wknd ? 'wknd' : ''} ${isHol && isVac ? 'both' : (isHol ? 'holiday' : (isVac ? 'vacation' : ''))}`.trim();
                     const rot = rotationForDate ? rotationForDate(cell.date) : null;
+                    const isToday = iso === todayISO;
                     return (
-                      <td key={ci} className={cls}>
-                        <div className="date">{cell.day}</div>
-                        {isHol && <div className="badge" style={{ border: '1px solid var(--danger)' }}>Holiday</div>}
-                        {isVac && <div className="badge" style={{ border: '1px solid var(--accent)' }}>Vacation</div>}
+                      <td key={ci} className={('day-cell ' + cls + (isToday ? ' today' : '')).trim()}
+                        onClick={() => openDay(iso)} title="Click to add a holiday or vacation">
+                        <div className="date"><span className="num">{cell.day}</span></div>
+                        {isHol && <div className="badge hol" title="Public holiday">🎉 Holiday</div>}
+                        {isVac && <div className="badge vac" title="Vacation">🏖️ Vacation</div>}
                         {rot && (
-                          <div className={'badge rot' + (rot.isMine ? ' mine' : '')} title={rot.names.join(', ')}>
+                          <div className={'badge rot' + (rot.isMine ? ' mine' : '')} title={'Office: ' + rot.names.join(', ')}>
                             🏢 {rot.isMine ? 'You' : rot.names.join(', ')}
                           </div>
                         )}
@@ -255,12 +266,16 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
 
       <div className="grid-2">
         <section className="card">
-          <h2>Public Holidays (API + custom)</h2>
+          <h2>🎉 Public holidays</h2>
           <div className="content">
-            <div className="hint">Source: Nager.Date API. Toggle to include/exclude in workday count. Add your own if needed.</div>
+            <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+              <span className="hint">Morocco holidays (Nager.Date) + your own. Toggle to include in the workday count.</span>
+              <button onClick={resetHolidays}>Reset to API</button>
+            </div>
             <div className="list" style={{ marginTop: 10 }}>
+              {sortedHolidays.length === 0 && <div className="hint">No holidays loaded.</div>}
               {sortedHolidays.map(({ d, info, source }) => (
-                <div className="row" key={d + source}>
+                <div className="row" key={d + source} style={{ opacity: info.enabled ? 1 : 0.5 }}>
                   <div>
                     <strong>{info.name}</strong><br />
                     <small>{fmtPretty(d)} • {source}</small>
@@ -269,32 +284,20 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
                     <button onClick={() => source === 'API' ? toggleApi(d, info.enabled) : toggleCustom(d)}>
                       {info.enabled ? 'Disable' : 'Enable'}
                     </button>
-                    {source === 'custom' && <button onClick={() => deleteCustom(d)}>Delete</button>}
+                    {source === 'custom' && <button className="ghost" onClick={() => deleteCustom(d)}>🗑</button>}
                   </div>
                 </div>
               ))}
             </div>
-            <hr />
-            <form className="toolbar" onSubmit={addCustomHoliday} autoComplete="off">
-              <input type="date" value={holidayInputs.date} onChange={(e) => setHolidayInputs({ ...holidayInputs, date: e.target.value })} required />
-              <input type="text" placeholder="Custom holiday name" value={holidayInputs.name} onChange={(e) => setHolidayInputs({ ...holidayInputs, name: e.target.value })} required />
-              <button className="primary" type="submit">Add Holiday</button>
-              <button type="button" onClick={resetHolidays}>Reset to API</button>
-            </form>
           </div>
         </section>
 
         <section className="card">
-          <h2>Vacations</h2>
+          <h2>🏖️ Vacations</h2>
           <div className="content">
-            <form className="toolbar" onSubmit={addVacation} autoComplete="off">
-              <input type="date" value={vacInputs.start} onChange={(e) => setVacInputs({ ...vacInputs, start: e.target.value })} required />
-              <input type="date" value={vacInputs.end} onChange={(e) => setVacInputs({ ...vacInputs, end: e.target.value })} required />
-              <input type="text" placeholder="Reason (optional)" value={vacInputs.title} onChange={(e) => setVacInputs({ ...vacInputs, title: e.target.value })} />
-              <button className="primary" type="submit">Add Vacation</button>
-            </form>
-            <div className="hint" style={{ marginTop: 6 }}>Vacation days are treated like non-working days if they fall on Mon–Fri.</div>
+            <div className="hint">Click a day on the calendar to add one. Vacation days on Mon–Fri count as non-working.</div>
             <div className="list" style={{ marginTop: 10 }}>
+              {yearState.vacations.length === 0 && <div className="hint">No vacations yet.</div>}
               {yearState.vacations.map((v) => (
                 <div className="row" key={v.id}>
                   <div>
@@ -302,7 +305,7 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
                     <small>{fmtPretty(v.start)} → {fmtPretty(v.end)}</small>
                   </div>
                   <div className="actions">
-                    <button onClick={() => removeVacation(v.id)}>Remove</button>
+                    <button className="ghost" onClick={() => removeVacation(v.id)}>🗑</button>
                   </div>
                 </div>
               ))}
@@ -337,6 +340,66 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
           </div>
         </div>
       </section>
+
+      {dayModal && (() => {
+        const iso = dayModal;
+        const dObj = parseISO(iso);
+        const api = apiHolidays[iso];
+        const custom = yearState.customHolidays[iso];
+        const covering = yearState.vacations.filter((v) => v.start <= iso && iso <= v.end);
+        return (
+          <div className="modal-backdrop" onClick={() => setDayModal(null)}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <h2 style={{ margin: 0 }}>{dObj.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</h2>
+              {isWeekend(dObj) && <div className="hint">Weekend — already a non-working day.</div>}
+
+              <div className="day-sec">
+                <strong>🎉 Public holiday</strong>
+                {api ? (
+                  <div className="row">
+                    <div>{api.name} <small className="hint">(Morocco)</small></div>
+                    <button onClick={() => toggleApi(iso, api.enabled)}>{api.enabled ? 'Disable' : 'Enable'}</button>
+                  </div>
+                ) : custom ? (
+                  <div className="row">
+                    <div>{custom.name} <small className="hint">(custom)</small></div>
+                    <div className="actions">
+                      <button onClick={() => toggleCustom(iso)}>{custom.enabled ? 'Disable' : 'Enable'}</button>
+                      <button className="ghost" onClick={() => deleteCustom(iso)}>Remove</button>
+                    </div>
+                  </div>
+                ) : (
+                  <form className="toolbar" onSubmit={(e) => { e.preventDefault(); if (!dayHolName.trim()) return; addCustomHolidayFor(iso, dayHolName); setDayHolName(''); }}>
+                    <input type="text" placeholder="Holiday name (e.g. Team off-day)" value={dayHolName} onChange={(e) => setDayHolName(e.target.value)} style={{ flex: 1, minWidth: 140 }} />
+                    <button className="primary" type="submit">Mark as holiday</button>
+                  </form>
+                )}
+              </div>
+
+              <hr />
+              <div className="day-sec">
+                <strong>🏖️ Vacation</strong>
+                {covering.map((v) => (
+                  <div className="row" key={v.id}>
+                    <div>{v.title || 'Vacation'}<br /><small>{fmtPretty(v.start)} → {fmtPretty(v.end)}</small></div>
+                    <button className="ghost" onClick={() => removeVacation(v.id)}>Remove</button>
+                  </div>
+                ))}
+                <form className="toolbar" onSubmit={(e) => { e.preventDefault(); addVacationRange(iso, dayVacEnd || iso, dayVacTitle); setDayModal(null); }}>
+                  <span className="hint">From {fmtPretty(iso)} to</span>
+                  <input type="date" value={dayVacEnd} min={iso} onChange={(e) => setDayVacEnd(e.target.value)} />
+                  <input type="text" placeholder="Reason (optional)" value={dayVacTitle} onChange={(e) => setDayVacTitle(e.target.value)} style={{ flex: 1, minWidth: 120 }} />
+                  <button className="primary" type="submit">Add vacation</button>
+                </form>
+              </div>
+
+              <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 4 }}>
+                <button onClick={() => setDayModal(null)}>Done</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

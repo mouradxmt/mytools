@@ -1,7 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useEncryptedState } from '../vault/useEncryptedState.js';
+import { fetchMoroccoHolidays, activeHolidaySet, vacationSetForMonth, workingDaysInMonth } from '../lib/workdays.js';
 
 const newId = () => (crypto.randomUUID && crypto.randomUUID()) || Math.random().toString(36).slice(2);
+const monthOptions = () => {
+  const now = new Date();
+  return Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    return { y: d.getFullYear(), m: d.getMonth(), label: d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) };
+  });
+};
 
 const blankInvoice = () => ({
   id: newId(),
@@ -29,6 +37,34 @@ export default function InvoicesApp() {
   });
   const [activeId, setActiveId] = useState(null);
   const [editing, setEditing] = useState(null);
+
+  // Read calendar data to build an invoice from a month's working days × TJM.
+  const curYear = new Date().getFullYear();
+  const [calUi] = useEncryptedState('calendar/ui', { tjm: 0 });
+  const [calYearCur] = useEncryptedState(`calendar/year/${curYear}`, { customHolidays: {}, vacations: [], apiOverrides: {} });
+  const [calYearPrev] = useEncryptedState(`calendar/year/${curYear - 1}`, { customHolidays: {}, vacations: [], apiOverrides: {} });
+  const [monthBusy, setMonthBusy] = useState(false);
+
+  const fromMonth = async (y, m) => {
+    setMonthBusy(true);
+    try {
+      const yearState = y === curYear ? calYearCur : calYearPrev;
+      const api = await fetchMoroccoHolidays(y);
+      const holidaySet = activeHolidaySet({ apiHolidays: api, apiOverrides: yearState.apiOverrides, customHolidays: yearState.customHolidays });
+      const vacationSet = vacationSetForMonth(yearState.vacations, y, m);
+      const { working } = workingDaysInMonth({ year: y, month: m, holidaySet, vacationSet });
+      const monthName = new Date(y, m, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      setEditing({
+        ...blankInvoice(),
+        currency: profile.defaultCurrency || 'MAD',
+        lines: [{ id: newId(), description: `Consulting services — ${monthName}`, qty: working, rate: calUi.tjm || 0 }],
+        notes: working ? `${working} working day${working === 1 ? '' : 's'} in ${monthName} (excl. weekends, holidays, vacations).` : ''
+      });
+      setActiveId(null);
+    } finally {
+      setMonthBusy(false);
+    }
+  };
 
   const sorted = useMemo(
     () => [...invoices].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
@@ -98,8 +134,21 @@ export default function InvoicesApp() {
       <section className="card no-print">
         <h2>Invoices ({invoices.length})</h2>
         <div className="content">
-          <div className="toolbar" style={{ marginBottom: 12 }}>
+          <div className="toolbar" style={{ marginBottom: 4 }}>
             <button className="primary" onClick={startNew}>＋ New invoice</button>
+            <span className="muted" style={{ marginLeft: 4 }}>or bill a month:</span>
+            <select
+              defaultValue=""
+              disabled={monthBusy}
+              onChange={(e) => { if (e.target.value) { const [y, m] = e.target.value.split('-').map(Number); fromMonth(y, m); e.target.value = ''; } }}
+            >
+              <option value="" disabled>📅 From a month…</option>
+              {monthOptions().map((o) => <option key={`${o.y}-${o.m}`} value={`${o.y}-${o.m}`}>{o.label}</option>)}
+            </select>
+            {monthBusy && <span className="hint">Calculating working days…</span>}
+          </div>
+          <div className="hint" style={{ marginBottom: 12 }}>
+            “From a month” pre-fills a line with that month’s working days × your TJM ({calUi.tjm ? calUi.tjm + ' MAD' : 'set it in Calendar'}).
           </div>
           {sorted.length === 0 && <div className="hint">No invoices yet.</div>}
           <div className="list">
