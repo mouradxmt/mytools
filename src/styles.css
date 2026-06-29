@@ -296,6 +296,23 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 .debt-item .actions button { padding: 3px 8px; }
 @media (max-width: 620px) { .budget-row { grid-template-columns: 90px 1fr 70px; } }
 
+/* Due-this-month banner */
+.due-banner { border: 1px solid var(--warn); }
+.due-banner > h2 { background: linear-gradient(180deg, color-mix(in srgb, var(--warn) 18%, transparent), transparent); color: var(--warn); }
+
+/* Savings goals */
+.goal-card { background: var(--rowbg); border: 1px solid var(--rowborder); border-radius: 10px; padding: 12px; }
+.goal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.goal-nums { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.goal-track { height: 12px; background: var(--field-bg); border-radius: 999px; overflow: hidden; margin: 8px 0; }
+.goal-fill { height: 100%; border-radius: 999px; min-width: 2%; background: var(--accent-grad); }
+.goal-fill.done { background: linear-gradient(135deg, #34d399, #10b981); }
+.goal-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+/* Balance trend */
+.trend { display: block; }
+.trend-labels { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted); }
+
 /* Transaction rows */
 .tx-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: var(--rowbg); border: 1px solid var(--rowborder); border-radius: 10px; border-left: 3px solid var(--border); }
 .tx-row.income { border-left-color: var(--ok); }

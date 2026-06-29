@@ -7,6 +7,7 @@ const monthKey = (iso) => (iso || '').slice(0, 7);
 const CAT_SUGGESTIONS = ['Salary', 'Freelance', 'Rent', 'Groceries', 'Transport', 'Utilities', 'Dining', 'Health', 'Shopping', 'Subscriptions', 'Savings', 'Other'];
 const blankDraft = () => ({ id: null, type: 'expense', amount: '', category: '', date: todayISO(), account: '', note: '' });
 const blankRec = () => ({ id: null, type: 'expense', amount: '', category: '', day: 1, account: '', note: '' });
+const blankGoal = () => ({ id: null, name: '', target: '', saved: '0', targetDate: '' });
 
 const normalizeDate = (s) => {
   s = (s || '').trim();
@@ -42,6 +43,9 @@ export default function FinanceApp() {
   const [importMsg, setImportMsg] = useState('');
   const [recDraft, setRecDraft] = useState(null);
   const [newBudget, setNewBudget] = useState({ category: '', amount: '' });
+  const [goals, setGoals] = useEncryptedState('finance/goals', []);
+  const [goalDraft, setGoalDraft] = useState(null);
+  const [contrib, setContrib] = useState({});
 
   const cur = settings.currency || 'MAD';
   const fmtMoney = (n) => {
@@ -126,6 +130,19 @@ export default function FinanceApp() {
     return { list, max };
   }, [tx]);
 
+  // Cumulative month-end balance over the last 6 months.
+  const trend = useMemo(() => {
+    const now = new Date();
+    const points = Array.from({ length: 6 }, (_, i) => {
+      const m = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const end = new Date(m.getFullYear(), m.getMonth() + 1, 0).toISOString().slice(0, 10);
+      const bal = tx.filter((t) => (t.date || '') <= end).reduce((s, t) => s + (t.type === 'income' ? 1 : -1) * (+t.amount || 0), 0);
+      return { label: m.toLocaleDateString(undefined, { month: 'short' }), bal };
+    });
+    const vals = points.map((p) => p.bal);
+    return { points, min: Math.min(0, ...vals), max: Math.max(0, ...vals) };
+  }, [tx]);
+
   // ── Mutations ────────────────────────────────────────────────────
   const save = (e) => {
     e.preventDefault();
@@ -160,9 +177,27 @@ export default function FinanceApp() {
   };
   const removeRec = (id) => setRecurring(recurring.filter((r) => r.id !== id));
   const recDoneThisMonth = (r) => tx.some((t) => monthKey(t.date) === periodMonth && t.type === r.type && t.category === r.category && Math.abs((+t.amount || 0) - (+r.amount || 0)) < 0.01);
-  const applyRec = (r) => {
-    const date = `${periodMonth}-${String(r.day || 1).padStart(2, '0')}`;
-    setTx([...tx, { id: newId(), createdAt: new Date().toISOString(), type: r.type, amount: +r.amount || 0, category: r.category, account: r.account || '', note: r.note || '(recurring)', date }]);
+  const recToTx = (r) => ({ id: newId(), createdAt: new Date().toISOString(), type: r.type, amount: +r.amount || 0, category: r.category, account: r.account || '', note: r.note || '(recurring)', date: `${periodMonth}-${String(r.day || 1).padStart(2, '0')}` });
+  const applyRec = (r) => setTx([...tx, recToTx(r)]);
+  const dueRecurring = recurring.filter((r) => !recDoneThisMonth(r));
+  const applyAllDue = () => { if (dueRecurring.length) setTx([...tx, ...dueRecurring.map(recToTx)]); };
+
+  // Savings goals
+  const saveGoal = (e) => {
+    e.preventDefault();
+    const target = Number(goalDraft.target);
+    if (!goalDraft.name.trim() || !target || target <= 0) return;
+    const rec = { name: goalDraft.name.trim(), target, saved: Number(goalDraft.saved) || 0, targetDate: goalDraft.targetDate };
+    if (goalDraft.id) setGoals(goals.map((g) => (g.id === goalDraft.id ? { ...g, ...rec } : g)));
+    else setGoals([...goals, { id: newId(), ...rec }]);
+    setGoalDraft(null);
+  };
+  const removeGoal = (id) => setGoals(goals.filter((g) => g.id !== id));
+  const contribute = (id) => {
+    const a = Number(contrib[id]) || 0;
+    if (!a) return;
+    setGoals(goals.map((g) => (g.id === id ? { ...g, saved: Math.max(0, (+g.saved || 0) + a) } : g)));
+    setContrib({ ...contrib, [id]: '' });
   };
 
   const exportCsv = () => {
@@ -207,6 +242,27 @@ export default function FinanceApp() {
 
   return (
     <>
+      {dueRecurring.length > 0 && (
+        <section className="card due-banner">
+          <h2>🔔 Due in {budgetMonthLabel} ({dueRecurring.length})</h2>
+          <div className="content">
+            <div className="list">
+              {dueRecurring.map((r) => (
+                <div className="row" key={r.id}>
+                  <div><strong className={r.type === 'income' ? 'pos' : 'neg'}>{r.type === 'income' ? '+' : '−'}{fmtMoney(r.amount)}</strong> · {r.category} <small className="hint">day {r.day}</small></div>
+                  <button className="primary" onClick={() => applyRec(r)}>＋ Add</button>
+                </div>
+              ))}
+            </div>
+            {dueRecurring.length > 1 && (
+              <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+                <button className="primary" onClick={applyAllDue}>Add all {dueRecurring.length}</button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Quick add */}
       <section className="card">
         <h2>{draft.id ? '✎ Edit transaction' : '＋ Add transaction'}</h2>
@@ -347,6 +403,53 @@ export default function FinanceApp() {
         </div>
       </section>
 
+      {/* Savings goals */}
+      <section className="card">
+        <h2>🐷 Savings goals</h2>
+        <div className="content">
+          <div className="toolbar" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+            <span className="hint">Track progress toward a target.</span>
+            <button className="primary" onClick={() => setGoalDraft(blankGoal())} disabled={!!goalDraft}>＋ Add goal</button>
+          </div>
+          {goalDraft && (
+            <form className="fin-add" onSubmit={saveGoal} style={{ marginBottom: 10 }}>
+              <input type="text" placeholder="Goal name (e.g. Emergency fund)" value={goalDraft.name} onChange={(e) => setGoalDraft({ ...goalDraft, name: e.target.value })} required style={{ flex: 1, minWidth: 150 }} />
+              <input type="number" min="0" placeholder={`Target (${cur})`} value={goalDraft.target} onChange={(e) => setGoalDraft({ ...goalDraft, target: e.target.value })} required style={{ width: 140 }} />
+              <input type="number" min="0" placeholder="Saved so far" value={goalDraft.saved} onChange={(e) => setGoalDraft({ ...goalDraft, saved: e.target.value })} style={{ width: 120 }} />
+              <label className="hint">by<input type="date" value={goalDraft.targetDate} onChange={(e) => setGoalDraft({ ...goalDraft, targetDate: e.target.value })} style={{ marginLeft: 6 }} /></label>
+              <button type="submit" className="primary">{goalDraft.id ? 'Save' : 'Add'}</button>
+              <button type="button" onClick={() => setGoalDraft(null)}>Cancel</button>
+            </form>
+          )}
+          {goals.length === 0 && !goalDraft && <div className="hint">No goals yet — add one to start tracking.</div>}
+          <div className="list">
+            {goals.map((g) => {
+              const saved = +g.saved || 0, target = +g.target || 0;
+              const ratio = target ? Math.min(1, saved / target) : 0;
+              const done = target > 0 && saved >= target;
+              return (
+                <div className="goal-card" key={g.id}>
+                  <div className="goal-head">
+                    <strong>{done ? '🏆 ' : ''}{g.name}</strong>
+                    <span className="goal-nums">{fmtMoney(saved)} / {fmtMoney(target)}{g.targetDate ? ` · by ${g.targetDate}` : ''}</span>
+                  </div>
+                  <div className="goal-track"><div className={'goal-fill' + (done ? ' done' : '')} style={{ width: (ratio * 100) + '%' }} /></div>
+                  <div className="goal-foot">
+                    <span className="hint">{done ? 'Reached 🎉' : `${fmtMoney(Math.max(0, target - saved))} to go`}</span>
+                    <span className="toolbar">
+                      <input type="number" min="0" placeholder="+ amount" value={contrib[g.id] || ''} onChange={(e) => setContrib({ ...contrib, [g.id]: e.target.value })} style={{ width: 110 }} />
+                      <button onClick={() => contribute(g.id)}>Add</button>
+                      <button onClick={() => setGoalDraft({ id: g.id, name: g.name, target: String(g.target), saved: String(g.saved), targetDate: g.targetDate || '' })}>✎</button>
+                      <button className="ghost" onClick={() => removeGoal(g.id)}>🗑</button>
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* Charts */}
       <div className="grid-2">
         <section className="card">
@@ -386,6 +489,30 @@ export default function FinanceApp() {
           </div>
         </section>
       </div>
+
+      {/* Balance trend */}
+      <section className="card">
+        <h2>Balance trend · month-end</h2>
+        <div className="content">
+          {(() => {
+            const { points, min, max } = trend;
+            const W = 600, H = 140, pad = 10, span = (max - min) || 1;
+            const x = (i) => pad + i * ((W - 2 * pad) / (points.length - 1));
+            const y = (v) => pad + (1 - (v - min) / span) * (H - 2 * pad);
+            const line = points.map((p, i) => `${x(i)},${y(p.bal)}`).join(' ');
+            const area = `${x(0)},${y(min)} ${line} ${x(points.length - 1)},${y(min)}`;
+            return (
+              <svg className="trend" viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 150 }}>
+                <polygon points={area} fill="var(--accent)" opacity="0.12" />
+                {min < 0 && <line x1={pad} x2={W - pad} y1={y(0)} y2={y(0)} stroke="var(--border)" strokeDasharray="5 5" />}
+                <polyline points={line} fill="none" stroke="var(--accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                {points.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.bal)} r="3.5" fill="var(--accent)" />)}
+              </svg>
+            );
+          })()}
+          <div className="trend-labels">{trend.points.map((p, i) => <span key={i}>{p.label}</span>)}</div>
+        </div>
+      </section>
 
       {/* Transactions */}
       <section className="card">
