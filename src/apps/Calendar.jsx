@@ -224,7 +224,7 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
             <span><span className="dot wknd"></span> Weekend</span>
             <span><span className="dot holiday"></span> Holiday</span>
             <span><span className="dot vacation"></span> Vacation</span>
-            {rotationForDate && <span><span className="dot office"></span> Office day</span>}
+            {rotationForDate && <span><span className="dot office"></span> Remote day</span>}
             <span className="hint">💡 Click any day to add a holiday or vacation</span>
           </div>
           <table className="calendar">
@@ -250,7 +250,7 @@ export default function CalendarApp({ rotationForDate = null } = {}) {
                         {isHol && <div className="badge hol" title="Public holiday">🎉 Holiday</div>}
                         {isVac && <div className="badge vac" title="Vacation">🏖️ Vacation</div>}
                         {rot && (
-                          <div className={'badge rot' + (rot.isMine ? ' mine' : '')} title={'Office: ' + rot.names.join(', ')}>
+                          <div className={'badge rot' + (rot.isMine ? ' mine' : '')} title={'Remote: ' + rot.names.join(', ')}>
                             🏢 {rot.display.join(', ')}
                           </div>
                         )}

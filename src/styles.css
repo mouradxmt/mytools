@@ -226,6 +226,53 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 /* Day editor modal sections */
 .day-sec { display: flex; flex-direction: column; gap: 8px; }
 .day-sec > strong { font-size: 14px; }
+
+/* ── Personal Finance ── */
+.seg-toggle.small button { padding: 7px 12px; }
+.seg-toggle button.active.ok-on { background: linear-gradient(135deg, #34d399, #10b981); color: #04261c; }
+.seg-toggle button.active.danger-on { background: linear-gradient(135deg, #fb7185, #f43f5e); color: #2a0710; }
+.fin-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.fin-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 760px) { .fin-summary { grid-template-columns: repeat(2, 1fr); } }
+.fin-stat { display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 12px; background: var(--rowbg); border: 1px solid var(--rowborder); border-left: 3px solid var(--border); }
+.fin-stat .lbl { font-size: 12px; color: var(--muted); }
+.fin-stat strong { font-size: 20px; }
+.fin-stat.income { border-left-color: var(--ok); }
+.fin-stat.income strong { color: var(--ok); }
+.fin-stat.expense { border-left-color: var(--danger); }
+.fin-stat.expense strong { color: var(--danger); }
+.fin-stat.balance { border-left-color: var(--accent); }
+.fin-stat.balance strong { color: var(--accent); }
+
+/* Category bars */
+.cat-list { display: flex; flex-direction: column; gap: 9px; }
+.cat-row { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; align-items: center; }
+.cat-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-track { height: 12px; background: var(--field-bg); border-radius: 999px; overflow: hidden; }
+.cat-fill { height: 100%; background: var(--accent-grad); border-radius: 999px; min-width: 2%; }
+.cat-amt { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* Monthly bars */
+.bars { display: flex; align-items: flex-end; justify-content: space-around; gap: 8px; height: 170px; padding-top: 8px; }
+.bar-col { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; height: 100%; justify-content: flex-end; }
+.bar-pair { display: flex; align-items: flex-end; gap: 4px; height: 100%; }
+.bar { width: 16px; border-radius: 5px 5px 0 0; min-height: 2px; transition: height .2s ease; }
+.bar.income { background: var(--ok); }
+.bar.expense { background: var(--danger); }
+.bar-label { font-size: 11px; color: var(--muted); }
+
+/* Transaction rows */
+.tx-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: var(--rowbg); border: 1px solid var(--rowborder); border-radius: 10px; border-left: 3px solid var(--border); }
+.tx-row.income { border-left-color: var(--ok); }
+.tx-row.expense { border-left-color: var(--danger); }
+.tx-main { flex: 1; min-width: 0; }
+.tx-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.tx-amt { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tx-amt.income { color: var(--ok); }
+.tx-amt.expense { color: var(--danger); }
+.tx-row .actions { display: flex; gap: 4px; flex: none; }
+.tx-row .actions button { padding: 4px 9px; }
 .wknd { background: var(--wknd); }
 .holiday { outline: 2px dashed var(--danger); outline-offset: -3px; }
 .vacation { background: rgba(79, 209, 197, .10); box-shadow: inset 0 0 0 2px rgba(79, 209, 197, .30); }

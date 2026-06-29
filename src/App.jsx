@@ -7,13 +7,15 @@ import TasksApp from './apps/Tasks.jsx';
 import InvoicesApp from './apps/Invoices.jsx';
 import KnowledgeApp from './apps/Knowledge.jsx';
 import ResumeApp from './apps/Resume.jsx';
+import PersonalApp from './apps/Personal.jsx';
 
 const TABS = [
   { id: 'calendar', label: 'Calendar', icon: '📅', Component: ScheduleApp },
   { id: 'tasks', label: 'Tasks', icon: '✅', Component: TasksApp },
   { id: 'knowledge', label: 'Knowledge', icon: '🧠', Component: KnowledgeApp },
   { id: 'resume', label: 'Resume', icon: '📄', Component: ResumeApp },
-  { id: 'invoices', label: 'Invoices', icon: '🧾', Component: InvoicesApp }
+  { id: 'invoices', label: 'Invoices', icon: '🧾', Component: InvoicesApp },
+  { id: 'personal', label: 'Personal', icon: '🧰', Component: PersonalApp }
 ];
 
 function RecoveryCodeModal() {

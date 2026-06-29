@@ -7,7 +7,7 @@ import CalendarApp from './Calendar.jsx';
 import RemoteRotationApp from './RemoteRotation.jsx';
 
 // Combined Calendar + Remote Rotation. The month view overlays the shared
-// rotation (who's in the office each day, with your days highlighted); the
+// rotation (who's working remotely each day, with your days highlighted); the
 // rotation view keeps the full weekly schedule + admin/team tools.
 export default function ScheduleApp() {
   const { session } = useVault();
@@ -54,7 +54,7 @@ export default function ScheduleApp() {
         <>
           {access && !rotationForDate && (
             <div className="hint" style={{ marginBottom: 10 }}>
-              Tip: pick “I am …” in the Rotation view to highlight your office days here.
+              Tip: pick “I am …” in the Rotation view to highlight your remote days here.
             </div>
           )}
           <CalendarApp rotationForDate={rotationForDate} />
