@@ -283,6 +283,17 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 .budget-left.over { color: var(--danger); font-weight: 600; }
 .pos { color: var(--ok); }
 .neg { color: var(--danger); }
+
+/* Debts / IOUs */
+.debt-person { background: var(--rowbg); border: 1px solid var(--rowborder); border-radius: 10px; padding: 10px 12px; }
+.debt-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.debt-net { font-size: 13px; margin-top: 2px; }
+.debt-items { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.debt-item { display: flex; align-items: center; gap: 10px; font-size: 13px; padding-top: 6px; border-top: 1px solid var(--border); }
+.debt-amt { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 80px; }
+.debt-reason { flex: 1; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.debt-item .actions { display: flex; gap: 4px; flex: none; }
+.debt-item .actions button { padding: 3px 8px; }
 @media (max-width: 620px) { .budget-row { grid-template-columns: 90px 1fr 70px; } }
 
 /* Transaction rows */

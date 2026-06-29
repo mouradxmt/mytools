@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import FinanceApp from './Finance.jsx';
+import DebtsApp from './Debts.jsx';
 
-// "Personal tools" section. First tool: Finance. Add more here later and the
-// switcher appears automatically.
+// "Personal tools" section. The switcher appears once there's more than one.
 const TOOLS = [
-  { id: 'finance', label: '💰 Finance', Component: FinanceApp }
+  { id: 'finance', label: '💰 Finance', Component: FinanceApp },
+  { id: 'debts', label: '💸 Debts', Component: DebtsApp }
 ];
 
 export default function PersonalApp() {
