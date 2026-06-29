@@ -5,9 +5,18 @@ const newId = () => (crypto.randomUUID && crypto.randomUUID()) || Math.random().
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const monthKey = (iso) => (iso || '').slice(0, 7);
 const CAT_SUGGESTIONS = ['Salary', 'Freelance', 'Rent', 'Groceries', 'Transport', 'Utilities', 'Dining', 'Health', 'Shopping', 'Subscriptions', 'Savings', 'Other'];
-const blankDraft = () => ({ id: null, type: 'expense', amount: '', category: '', date: todayISO(), account: '', note: '' });
+const blankDraft = () => ({ id: null, type: 'expense', amount: '', category: '', date: todayISO(), accountId: null, account: '', note: '' });
 const blankRec = () => ({ id: null, type: 'expense', amount: '', category: '', day: 1, account: '', note: '' });
 const blankGoal = () => ({ id: null, name: '', target: '', saved: '0', targetDate: '' });
+const ACCOUNT_TYPES = [
+  { id: 'cash', label: 'Cash', icon: '💵' },
+  { id: 'bank', label: 'Bank', icon: '🏦' },
+  { id: 'savings', label: 'Savings', icon: '🏛️' },
+  { id: 'card', label: 'Card', icon: '💳' },
+  { id: 'other', label: 'Other', icon: '📦' }
+];
+const accountIcon = (type) => (ACCOUNT_TYPES.find((t) => t.id === type) || {}).icon || '💳';
+const blankAccount = () => ({ id: null, name: '', type: 'bank', opening: '0' });
 
 const normalizeDate = (s) => {
   s = (s || '').trim();
@@ -46,6 +55,12 @@ export default function FinanceApp() {
   const [goals, setGoals] = useEncryptedState('finance/goals', []);
   const [goalDraft, setGoalDraft] = useState(null);
   const [contrib, setContrib] = useState({});
+  const [accounts, setAccounts] = useEncryptedState('finance/accounts', []);
+  const [transfers, setTransfers] = useEncryptedState('finance/transfers', []);
+  const [acctDraft, setAcctDraft] = useState(null);
+  const [transfer, setTransfer] = useState({ from: '', to: '', amount: '', date: todayISO(), note: '' });
+
+  const accName = (id) => (accounts.find((a) => a.id === id) || {}).name || '—';
 
   const cur = settings.currency || 'MAD';
   const fmtMoney = (n) => {
@@ -143,17 +158,30 @@ export default function FinanceApp() {
     return { points, min: Math.min(0, ...vals), max: Math.max(0, ...vals) };
   }, [tx]);
 
+  // Per-account balances = opening + assigned transactions + transfers in/out.
+  const accountBalances = useMemo(() => {
+    const map = {};
+    accounts.forEach((a) => { map[a.id] = +a.opening || 0; });
+    tx.forEach((t) => { if (t.accountId && map[t.accountId] != null) map[t.accountId] += (t.type === 'income' ? 1 : -1) * (+t.amount || 0); });
+    transfers.forEach((tr) => { if (map[tr.from] != null) map[tr.from] -= +tr.amount || 0; if (map[tr.to] != null) map[tr.to] += +tr.amount || 0; });
+    return map;
+  }, [accounts, tx, transfers]);
+  const unassigned = useMemo(() => tx.filter((t) => !t.accountId || !accounts.some((a) => a.id === t.accountId))
+    .reduce((s, t) => s + (t.type === 'income' ? 1 : -1) * (+t.amount || 0), 0), [tx, accounts]);
+  const netWorth = useMemo(() => accounts.reduce((s, a) => s + (+a.opening || 0), 0)
+    + tx.reduce((s, t) => s + (t.type === 'income' ? 1 : -1) * (+t.amount || 0), 0), [accounts, tx]);
+
   // ── Mutations ────────────────────────────────────────────────────
   const save = (e) => {
     e.preventDefault();
     const amount = Number(draft.amount);
     if (!amount || amount <= 0) return;
-    const rec = { type: draft.type, amount, category: draft.category.trim() || 'Uncategorized', date: draft.date || todayISO(), account: draft.account.trim(), note: draft.note.trim() };
+    const rec = { type: draft.type, amount, category: draft.category.trim() || 'Uncategorized', date: draft.date || todayISO(), accountId: draft.accountId || null, account: draft.account.trim(), note: draft.note.trim() };
     if (draft.id) setTx(tx.map((t) => (t.id === draft.id ? { ...t, ...rec } : t)));
     else setTx([...tx, { id: newId(), createdAt: new Date().toISOString(), ...rec }]);
-    setDraft({ ...blankDraft(), type: draft.type });
+    setDraft({ ...blankDraft(), type: draft.type, accountId: draft.accountId, account: draft.account });
   };
-  const editTx = (t) => setDraft({ id: t.id, type: t.type, amount: String(t.amount), category: t.category, date: t.date, account: t.account || '', note: t.note || '' });
+  const editTx = (t) => setDraft({ id: t.id, type: t.type, amount: String(t.amount), category: t.category, date: t.date, accountId: t.accountId || null, account: t.account || '', note: t.note || '' });
   const removeTx = (id) => { setTx(tx.filter((t) => t.id !== id)); if (draft.id === id) setDraft(blankDraft()); };
 
   const setBudget = (cat, amount) => {
@@ -200,6 +228,30 @@ export default function FinanceApp() {
     setContrib({ ...contrib, [id]: '' });
   };
 
+  // Accounts + transfers
+  const saveAccount = (e) => {
+    e.preventDefault();
+    if (!acctDraft.name.trim()) return;
+    const rec = { name: acctDraft.name.trim(), type: acctDraft.type, opening: Number(acctDraft.opening) || 0 };
+    if (acctDraft.id) setAccounts(accounts.map((a) => (a.id === acctDraft.id ? { ...a, ...rec } : a)));
+    else setAccounts([...accounts, { id: newId(), ...rec }]);
+    setAcctDraft(null);
+  };
+  const removeAccount = (id) => {
+    if (!confirm('Delete this account? Its transactions become unassigned and related transfers are removed.')) return;
+    setAccounts(accounts.filter((a) => a.id !== id));
+    setTx(tx.map((t) => (t.accountId === id ? { ...t, accountId: null } : t)));
+    setTransfers(transfers.filter((t) => t.from !== id && t.to !== id));
+  };
+  const doTransfer = (e) => {
+    e.preventDefault();
+    const amt = Number(transfer.amount);
+    if (!amt || amt <= 0 || !transfer.from || !transfer.to || transfer.from === transfer.to) return;
+    setTransfers([...transfers, { id: newId(), from: transfer.from, to: transfer.to, amount: amt, date: transfer.date || todayISO(), note: transfer.note.trim() }]);
+    setTransfer({ from: '', to: '', amount: '', date: todayISO(), note: '' });
+  };
+  const removeTransfer = (id) => setTransfers(transfers.filter((t) => t.id !== id));
+
   const exportCsv = () => {
     const esc = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const rows = [['Date', 'Type', 'Amount', 'Currency', 'Category', 'Account', 'Note']];
@@ -226,10 +278,12 @@ export default function FinanceApp() {
         if (!amount) continue;
         const tstr = (c[ti >= 0 ? ti : 1] || '').toLowerCase();
         const type = tstr.includes('inc') ? 'income' : tstr.includes('exp') ? 'expense' : (amount < 0 ? 'expense' : 'income');
+        const acctName = (c[aci] || '').trim();
+        const acctMatch = accounts.find((a) => a.name.toLowerCase() === acctName.toLowerCase());
         added.push({
           id: newId(), createdAt: new Date().toISOString(), type, amount: Math.abs(amount),
           category: (c[ci >= 0 ? ci : 4] || 'Uncategorized').trim() || 'Uncategorized',
-          date: normalizeDate(c[di >= 0 ? di : 0]), account: (c[aci] || '').trim(), note: (c[ni] || '').trim()
+          date: normalizeDate(c[di >= 0 ? di : 0]), accountId: acctMatch ? acctMatch.id : null, account: acctName, note: (c[ni] || '').trim()
         });
       }
       if (added.length) { setTx([...tx, ...added]); setImportMsg(`Imported ${added.length} transaction${added.length === 1 ? '' : 's'}.`); }
@@ -276,7 +330,10 @@ export default function FinanceApp() {
             <input type="text" placeholder="Category" list="fin-cats" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} style={{ width: 150 }} />
             <datalist id="fin-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
             <input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
-            <input type="text" placeholder="Account (optional)" value={draft.account} onChange={(e) => setDraft({ ...draft, account: e.target.value })} style={{ width: 130 }} />
+            <select value={draft.accountId || ''} onChange={(e) => { const a = accounts.find((x) => x.id === e.target.value); setDraft({ ...draft, accountId: e.target.value || null, account: a ? a.name : '' }); }}>
+              <option value="">— account —</option>
+              {accounts.map((a) => <option key={a.id} value={a.id}>{accountIcon(a.type)} {a.name}</option>)}
+            </select>
             <input type="text" placeholder="Note (optional)" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} style={{ flex: 1, minWidth: 140 }} />
             <button type="submit" className="primary">{draft.id ? 'Update' : 'Add'}</button>
             {draft.id && <button type="button" onClick={() => setDraft(blankDraft())}>Cancel</button>}
@@ -318,8 +375,79 @@ export default function FinanceApp() {
             <div className="fin-stat income"><span className="lbl">Income · {periodLabel}</span><strong>{fmtMoney(totals.income)}</strong></div>
             <div className="fin-stat expense"><span className="lbl">Expenses</span><strong>{fmtMoney(totals.expense)}</strong></div>
             <div className={'fin-stat ' + (totals.net >= 0 ? 'income' : 'expense')}><span className="lbl">Net</span><strong>{fmtMoney(totals.net)}</strong></div>
-            <div className="fin-stat balance"><span className="lbl">Balance (all time)</span><strong>{fmtMoney(totals.balance)}</strong></div>
+            <div className="fin-stat balance"><span className="lbl">Net worth</span><strong>{fmtMoney(netWorth)}</strong></div>
           </div>
+        </div>
+      </section>
+
+      {/* Accounts */}
+      <section className="card">
+        <h2>🏦 Accounts</h2>
+        <div className="content">
+          <div className="toolbar" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
+            <span className="pill strong">Net worth · {fmtMoney(netWorth)}</span>
+            <button className="primary" onClick={() => setAcctDraft(blankAccount())} disabled={!!acctDraft}>＋ Add account</button>
+          </div>
+          {acctDraft && (
+            <form className="fin-add" onSubmit={saveAccount} style={{ marginBottom: 10 }}>
+              <input type="text" placeholder="Account name (e.g. CIH Bank)" value={acctDraft.name} onChange={(e) => setAcctDraft({ ...acctDraft, name: e.target.value })} required style={{ flex: 1, minWidth: 150 }} />
+              <select value={acctDraft.type} onChange={(e) => setAcctDraft({ ...acctDraft, type: e.target.value })}>
+                {ACCOUNT_TYPES.map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+              </select>
+              <input type="number" placeholder={`Opening balance (${cur})`} value={acctDraft.opening} onChange={(e) => setAcctDraft({ ...acctDraft, opening: e.target.value })} style={{ width: 170 }} />
+              <button type="submit" className="primary">{acctDraft.id ? 'Save' : 'Add'}</button>
+              <button type="button" onClick={() => setAcctDraft(null)}>Cancel</button>
+            </form>
+          )}
+          {accounts.length === 0 && !acctDraft && <div className="hint">No accounts yet — add Cash, Bank, Savings… then assign transactions to them.</div>}
+          <div className="acct-grid">
+            {accounts.map((a) => (
+              <div className="acct-card" key={a.id}>
+                <div className="acct-top"><span className="acct-icon">{accountIcon(a.type)}</span><span className="acct-name" title={a.name}>{a.name}</span></div>
+                <div className={'acct-bal ' + ((accountBalances[a.id] || 0) < 0 ? 'neg' : '')}>{fmtMoney(accountBalances[a.id] || 0)}</div>
+                <div className="acct-actions">
+                  <button onClick={() => setAcctDraft({ id: a.id, name: a.name, type: a.type, opening: String(a.opening || 0) })}>✎</button>
+                  <button className="ghost" onClick={() => removeAccount(a.id)}>🗑</button>
+                </div>
+              </div>
+            ))}
+            {unassigned !== 0 && (
+              <div className="acct-card">
+                <div className="acct-top"><span className="acct-icon">❓</span><span className="acct-name">Unassigned</span></div>
+                <div className={'acct-bal ' + (unassigned < 0 ? 'neg' : '')}>{fmtMoney(unassigned)}</div>
+              </div>
+            )}
+          </div>
+
+          {accounts.length >= 2 && (
+            <>
+              <hr />
+              <strong>↔ Transfer between accounts</strong>
+              <form className="fin-add" onSubmit={doTransfer} style={{ marginTop: 8 }}>
+                <select value={transfer.from} onChange={(e) => setTransfer({ ...transfer, from: e.target.value })} required>
+                  <option value="">From…</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+                <span>→</span>
+                <select value={transfer.to} onChange={(e) => setTransfer({ ...transfer, to: e.target.value })} required>
+                  <option value="">To…</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+                <input type="number" min="0" step="0.01" placeholder={`Amount (${cur})`} value={transfer.amount} onChange={(e) => setTransfer({ ...transfer, amount: e.target.value })} required style={{ width: 130 }} />
+                <input type="date" value={transfer.date} onChange={(e) => setTransfer({ ...transfer, date: e.target.value })} />
+                <input type="text" placeholder="Note" value={transfer.note} onChange={(e) => setTransfer({ ...transfer, note: e.target.value })} style={{ width: 120 }} />
+                <button type="submit" className="primary">Transfer</button>
+              </form>
+              {transfers.length > 0 && (
+                <div className="list" style={{ marginTop: 10 }}>
+                  {[...transfers].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((tr) => (
+                    <div className="row" key={tr.id}>
+                      <div>{accName(tr.from)} <strong>→</strong> {accName(tr.to)} · {fmtMoney(tr.amount)}<br /><small>{tr.date}{tr.note ? ` · ${tr.note}` : ''}</small></div>
+                      <button className="ghost" onClick={() => removeTransfer(tr.id)}>🗑</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </section>
 

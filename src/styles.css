@@ -296,6 +296,18 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 .debt-item .actions button { padding: 3px 8px; }
 @media (max-width: 620px) { .budget-row { grid-template-columns: 90px 1fr 70px; } }
 
+/* Accounts */
+.acct-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.acct-card { background: var(--rowbg); border: 1px solid var(--rowborder); border-radius: 12px; padding: 12px; position: relative; }
+.acct-top { display: flex; align-items: center; gap: 8px; }
+.acct-icon { font-size: 18px; }
+.acct-name { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-bal { font-size: 20px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; color: var(--text); }
+.acct-bal.neg { color: var(--danger); }
+.acct-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.acct-card:hover .acct-actions { opacity: 1; }
+.acct-actions button { padding: 3px 7px; font-size: 12px; }
+
 /* Due-this-month banner */
 .due-banner { border: 1px solid var(--warn); }
 .due-banner > h2 { background: linear-gradient(180deg, color-mix(in srgb, var(--warn) 18%, transparent), transparent); color: var(--warn); }
