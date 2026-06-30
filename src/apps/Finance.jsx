@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useEncryptedState } from '../vault/useEncryptedState.js';
 
 const newId = () => (crypto.randomUUID && crypto.randomUUID()) || Math.random().toString(36).slice(2);
@@ -17,6 +17,14 @@ const ACCOUNT_TYPES = [
 ];
 const accountIcon = (type) => (ACCOUNT_TYPES.find((t) => t.id === type) || {}).icon || '💳';
 const blankAccount = () => ({ id: null, name: '', type: 'bank', opening: '0' });
+const FIN_VIEWS = [
+  { id: 'overview', label: '📊 Overview' },
+  { id: 'accounts', label: '🏦 Accounts' },
+  { id: 'budgets', label: '🎯 Budgets' },
+  { id: 'recurring', label: '🔁 Recurring' },
+  { id: 'goals', label: '🐷 Goals' },
+  { id: 'transactions', label: '🧾 Transactions' }
+];
 
 const normalizeDate = (s) => {
   s = (s || '').trim();
@@ -59,6 +67,8 @@ export default function FinanceApp() {
   const [transfers, setTransfers] = useEncryptedState('finance/transfers', []);
   const [acctDraft, setAcctDraft] = useState(null);
   const [transfer, setTransfer] = useState({ from: '', to: '', amount: '', date: todayISO(), note: '' });
+  const [view, setView] = useState(() => localStorage.getItem('mytools.financeView') || 'overview');
+  useEffect(() => { localStorage.setItem('mytools.financeView', view); }, [view]);
 
   const accName = (id) => (accounts.find((a) => a.id === id) || {}).name || '—';
 
@@ -380,7 +390,13 @@ export default function FinanceApp() {
         </div>
       </section>
 
-      {/* Accounts */}
+      <nav className="subnav">
+        {FIN_VIEWS.map((v) => (
+          <button key={v.id} className={view === v.id ? 'active' : ''} onClick={() => setView(v.id)}>{v.label}</button>
+        ))}
+      </nav>
+
+      {view === 'accounts' && (
       <section className="card">
         <h2>🏦 Accounts</h2>
         <div className="content">
@@ -451,7 +467,9 @@ export default function FinanceApp() {
         </div>
       </section>
 
-      {/* Budgets */}
+      )}
+
+      {view === 'budgets' && (
       <section className="card">
         <h2>🎯 Budgets · {budgetMonthLabel}</h2>
         <div className="content">
@@ -487,7 +505,9 @@ export default function FinanceApp() {
         </div>
       </section>
 
-      {/* Recurring */}
+      )}
+
+      {view === 'recurring' && (
       <section className="card">
         <h2>🔁 Recurring</h2>
         <div className="content">
@@ -531,7 +551,9 @@ export default function FinanceApp() {
         </div>
       </section>
 
-      {/* Savings goals */}
+      )}
+
+      {view === 'goals' && (
       <section className="card">
         <h2>🐷 Savings goals</h2>
         <div className="content">
@@ -578,7 +600,10 @@ export default function FinanceApp() {
         </div>
       </section>
 
-      {/* Charts */}
+      )}
+
+      {view === 'overview' && (
+      <>
       <div className="grid-2">
         <section className="card">
           <h2>Spending by category · {periodLabel}</h2>
@@ -642,7 +667,10 @@ export default function FinanceApp() {
         </div>
       </section>
 
-      {/* Transactions */}
+      </>
+      )}
+
+      {view === 'transactions' && (
       <section className="card">
         <h2>Transactions ({filtered.length})</h2>
         <div className="content">
@@ -671,6 +699,7 @@ export default function FinanceApp() {
           </div>
         </div>
       </section>
+      )}
     </>
   );
 }

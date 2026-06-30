@@ -296,6 +296,13 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 .debt-item .actions button { padding: 3px 8px; }
 @media (max-width: 620px) { .budget-row { grid-template-columns: 90px 1fr 70px; } }
 
+/* Finance sub-nav */
+.subnav { display: flex; gap: 4px; overflow-x: auto; margin-bottom: 16px; padding-bottom: 2px; scrollbar-width: none; }
+.subnav::-webkit-scrollbar { display: none; }
+.subnav button { background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 8px 8px 0 0; padding: 9px 13px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+.subnav button:hover { color: var(--text); background: var(--panel-2); }
+.subnav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
 /* Accounts */
 .acct-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
 .acct-card { background: var(--rowbg); border: 1px solid var(--rowborder); border-radius: 12px; padding: 12px; position: relative; }
