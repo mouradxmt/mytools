@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react';
 import { VaultProvider, useVault } from './vault/VaultContext.jsx';
 import LoginScreen from './vault/LoginScreen.jsx';
 import Tabs from './components/Tabs.jsx';
+import HomeApp from './apps/Home.jsx';
 import ScheduleApp from './apps/Schedule.jsx';
 import TasksApp from './apps/Tasks.jsx';
 import InvoicesApp from './apps/Invoices.jsx';
 import KnowledgeApp from './apps/Knowledge.jsx';
 import ResumeApp from './apps/Resume.jsx';
 import PersonalApp from './apps/Personal.jsx';
+import { buildBackupFile, restoreBackupFile } from './vault/backup.js';
 
 const TABS = [
+  { id: 'home', label: 'Today', icon: '🏠', Component: HomeApp },
   { id: 'calendar', label: 'Calendar', icon: '📅', Component: ScheduleApp },
   { id: 'tasks', label: 'Tasks', icon: '✅', Component: TasksApp },
   { id: 'knowledge', label: 'Knowledge', icon: '🧠', Component: KnowledgeApp },
@@ -113,12 +116,113 @@ function ChangePasswordModal({ onClose }) {
   );
 }
 
+function BackupModal({ onClose }) {
+  const { masterKey, session } = useVault();
+  const email = session?.user?.email || '';
+  const [mode, setMode] = useState('export');
+  const [pass, setPass] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [fileObj, setFileObj] = useState(null);
+  const [importPass, setImportPass] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const doExport = async (e) => {
+    e.preventDefault();
+    setErr(''); setMsg('');
+    if (pass.length < 8) { setErr('Passphrase must be at least 8 characters.'); return; }
+    if (pass !== confirm) { setErr('Passphrases do not match.'); return; }
+    setBusy(true);
+    try {
+      const { file, count, skipped } = await buildBackupFile({ masterKey, session, email, passphrase: pass });
+      const blob = new Blob([JSON.stringify(file)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `mytools-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+      URL.revokeObjectURL(url);
+      setMsg(`Downloaded a backup of ${count} item${count === 1 ? '' : 's'}${skipped.length ? ` (${skipped.length} unreadable, skipped)` : ''}. Keep the file and its passphrase safe.`);
+      setPass(''); setConfirm('');
+    } catch (e) {
+      setErr(e.message || String(e));
+    } finally { setBusy(false); }
+  };
+
+  const doImport = async (e) => {
+    e.preventDefault();
+    setErr(''); setMsg('');
+    if (!fileObj) { setErr('Choose a backup file first.'); return; }
+    if (!confirm0('Restore overwrites your current data for every section in the backup file. Continue?')) return;
+    setBusy(true);
+    try {
+      const parsed = JSON.parse(await fileObj.text());
+      const { restored, exportedAt } = await restoreBackupFile({ masterKey, session, passphrase: importPass, file: parsed });
+      setMsg(`Restored ${restored} item${restored === 1 ? '' : 's'} from ${exportedAt ? new Date(exportedAt).toLocaleString() : 'backup'}. Reloading…`);
+      setTimeout(() => window.location.reload(), 1400);
+    } catch (e) {
+      const m = e.message || String(e);
+      setErr(/backup file|Unrecognized/.test(m) ? m : 'Could not restore — wrong passphrase or corrupt file.');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <h2 style={{ margin: 0 }}>🗄️ Backup &amp; restore</h2>
+        <p className="hint">
+          A backup is your entire vault encrypted under a <strong>separate passphrase</strong> you choose here.
+          It restores even if you lose your password &amp; recovery code — and into any account.
+        </p>
+        <div className="seg-toggle small" style={{ margin: '4px 0 10px' }}>
+          <button type="button" className={mode === 'export' ? 'active' : ''} onClick={() => { setMode('export'); setErr(''); setMsg(''); }}>⬇ Export</button>
+          <button type="button" className={mode === 'import' ? 'active' : ''} onClick={() => { setMode('import'); setErr(''); setMsg(''); }}>⬆ Restore</button>
+        </div>
+
+        {mode === 'export' ? (
+          <form onSubmit={doExport}>
+            <input type="password" autoComplete="new-password" placeholder="Backup passphrase (min 8 chars)"
+              value={pass} onChange={(e) => setPass(e.target.value)} required minLength={8} autoFocus />
+            <input type="password" autoComplete="new-password" placeholder="Confirm passphrase"
+              value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={8} />
+            {err && <div className="err">{err}</div>}
+            {msg && <div className="hint" style={{ color: 'var(--ok)' }}>{msg}</div>}
+            <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
+              <button type="button" onClick={onClose} disabled={busy}>Close</button>
+              <button type="submit" className="primary" disabled={busy}>{busy ? 'Preparing…' : '⬇ Download backup'}</button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={doImport}>
+            <label className="filebtn" style={{ display: 'block', textAlign: 'center', marginBottom: 8 }}>
+              {fileObj ? `📄 ${fileObj.name}` : '📂 Choose backup file…'}
+              <input type="file" accept=".json,application/json" hidden onChange={(e) => { setFileObj(e.target.files[0] || null); setErr(''); setMsg(''); }} />
+            </label>
+            <input type="password" autoComplete="off" placeholder="Backup passphrase"
+              value={importPass} onChange={(e) => setImportPass(e.target.value)} required />
+            <div className="hint" style={{ color: 'var(--warn)', marginTop: 6 }}>
+              ⚠ Overwrites current data for every section contained in the file.
+            </div>
+            {err && <div className="err">{err}</div>}
+            {msg && <div className="hint" style={{ color: 'var(--ok)' }}>{msg}</div>}
+            <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
+              <button type="button" onClick={onClose} disabled={busy}>Close</button>
+              <button type="submit" className="primary" disabled={busy}>{busy ? 'Restoring…' : '⬆ Restore backup'}</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+const confirm0 = (m) => window.confirm(m);
+
 function Shell() {
   const { unlocked, lock, signOut, session, authReady, autoLockMin, setAutoLockMin } = useVault();
-  const [active, setActive] = useState(() => localStorage.getItem('mytools.activeTab') || 'calendar');
+  const [active, setActive] = useState(() => localStorage.getItem('mytools.activeTab') || 'home');
   const [theme, setTheme] = useState(() => localStorage.getItem('mytools.theme') || 'dark');
   const [menuOpen, setMenuOpen] = useState(false);
   const [showChangePw, setShowChangePw] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -174,16 +278,18 @@ function Shell() {
             {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
           </button>
           <button className="ghost" onClick={() => { setMenuOpen(false); setShowChangePw(true); }}>🔑 Password</button>
+          <button className="ghost" onClick={() => { setMenuOpen(false); setShowBackup(true); }}>🗄️ Backup</button>
           <button className="ghost" onClick={() => { setMenuOpen(false); lock(); }}>🔒 Lock</button>
           <button className="ghost" onClick={() => { setMenuOpen(false); signOut(); }}>↪ Sign out</button>
         </div>
       </header>
       <Tabs tabs={TABS} active={activeTab.id} onChange={(id) => { setActive(id); setMenuOpen(false); }} />
       <main className="app-main">
-        <Active />
+        <Active onNavigate={setActive} />
       </main>
       <RecoveryCodeModal />
       {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
+      {showBackup && <BackupModal onClose={() => setShowBackup(false)} />}
     </>
   );
 }

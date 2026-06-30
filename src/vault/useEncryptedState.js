@@ -3,8 +3,8 @@ import { useVault } from './VaultContext.jsx';
 import { decryptJSON, encryptJSON } from './crypto.js';
 import * as backend from '../sync/supabase.js';
 
-const CACHE_PREFIX = 'mytools.cache.';
-const DIRTY_PREFIX = 'mytools.dirty.';
+export const CACHE_PREFIX = 'mytools.cache.';
+export const DIRTY_PREFIX = 'mytools.dirty.';
 
 function readLocal(namespace) {
   try {

@@ -137,3 +137,37 @@ export async function decryptJSON(masterKey, blob) {
   );
   return JSON.parse(dec.decode(pt));
 }
+
+// ── Portable encrypted backup ────────────────────────────────────────
+// A backup is the plaintext vault re-encrypted under a user-chosen passphrase,
+// independent of the account's master key — so it can be restored even after
+// losing the password/recovery code, or into a brand-new account.
+const BACKUP_ITER = 250_000;
+
+async function deriveBackupKey(passphrase, saltBytes, iterations) {
+  const baseKey = await crypto.subtle.importKey(
+    'raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: saltBytes, iterations, hash: 'SHA-256' },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+export async function encryptBackup(passphrase, payload) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveBackupKey(passphrase, salt, BACKUP_ITER);
+  const { iv, ct } = await encryptJSON(key, payload);
+  return { app: 'mytools-backup', v: 1, kdf: { algo: 'PBKDF2-SHA256', iter: BACKUP_ITER, salt: b64(salt) }, iv, ct };
+}
+
+export async function decryptBackup(passphrase, file) {
+  if (!file || file.app !== 'mytools-backup' || !file.kdf?.salt) {
+    throw new Error('Not a mytools backup file.');
+  }
+  const key = await deriveBackupKey(passphrase, ub64(file.kdf.salt), file.kdf.iter || BACKUP_ITER);
+  return decryptJSON(key, { iv: file.iv, ct: file.ct }); // throws on wrong passphrase
+}

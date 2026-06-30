@@ -3,6 +3,10 @@ import { useEncryptedState } from '../vault/useEncryptedState.js';
 import { fetchMoroccoHolidays, activeHolidaySet, vacationSetForMonth, workingDaysInMonth } from '../lib/workdays.js';
 
 const newId = () => (crypto.randomUUID && crypto.randomUUID()) || Math.random().toString(36).slice(2);
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+// Category used for the Finance income transaction auto-created from a paid invoice.
+const FINANCE_CATEGORY = 'Freelance';
 
 const monthOptions = () => {
   const now = new Date();
@@ -41,6 +45,8 @@ export default function InvoicesApp() {
     bankName: '', bankIban: '', bankAccountNumber: '', bankAccountHolder: '', bankSwift: ''
   });
   const [clients, setClients] = useEncryptedState('invoices/clients', []);
+  // Shared with the Finance tool: marking an invoice paid records income here.
+  const [, setTx] = useEncryptedState('finance/tx', []);
   const [activeId, setActiveId] = useState(null);
   const [editing, setEditing] = useState(null);
   const [clientDraft, setClientDraft] = useState(blankClient());
@@ -59,20 +65,61 @@ export default function InvoicesApp() {
   const active = invoices.find((i) => i.id === activeId);
   const total = (inv) => (inv?.lines || []).reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.rate) || 0), 0);
 
+  // Keep finance/tx in sync with an invoice's paid state. One linked income tx
+  // per invoice (tagged invoiceId); created/updated when paid, removed otherwise.
+  const reconcileTx = (list, inv) => {
+    const linked = list.find((t) => t.invoiceId === inv.id);
+    if (inv.status !== 'paid') return linked ? list.filter((t) => t.invoiceId !== inv.id) : list;
+    const rec = {
+      type: 'income', amount: total(inv), category: FINANCE_CATEGORY,
+      date: inv.paidDate || inv.date || todayISO(),
+      note: `Invoice #${inv.number || '—'}${inv.client ? ' · ' + inv.client : ''}`,
+      invoiceId: inv.id, currency: inv.currency
+    };
+    if (linked) return list.map((t) => (t.invoiceId === inv.id ? { ...t, ...rec } : t));
+    return [...list, { id: newId(), createdAt: new Date().toISOString(), accountId: null, account: '', ...rec }];
+  };
+
+  // Accounts-receivable snapshot (assumes the default currency for totals).
+  const ar = useMemo(() => {
+    const year = String(new Date().getFullYear());
+    let outstanding = 0, overdue = 0, paidYtd = 0, openCount = 0;
+    invoices.forEach((inv) => {
+      const amt = total(inv);
+      if (inv.status === 'paid') {
+        if ((inv.paidDate || inv.date || '').startsWith(year)) paidYtd += amt;
+      } else if (inv.status === 'sent' || inv.status === 'overdue') {
+        outstanding += amt; openCount++;
+        if (inv.status === 'overdue' || (inv.dueDate && inv.dueDate < todayISO())) overdue += amt;
+      }
+    });
+    return { outstanding, overdue, paidYtd, openCount };
+  }, [invoices]);
+
   // ── Invoice CRUD ─────────────────────────────────────────────────────
   const startNew = () => { setEditing({ ...blankInvoice(), currency: profile.defaultCurrency || 'MAD' }); setActiveId(null); };
   const editExisting = (inv) => { setEditing(JSON.parse(JSON.stringify(inv))); setActiveId(inv.id); };
   const cancelEdit = () => setEditing(null);
   const saveEdit = () => {
-    const exists = invoices.some((i) => i.id === editing.id);
-    setInvoices(exists ? invoices.map((i) => (i.id === editing.id ? editing : i)) : [...invoices, editing]);
-    setActiveId(editing.id);
+    const inv = { ...editing };
+    if (inv.status === 'paid' && !inv.paidDate) inv.paidDate = inv.date || todayISO();
+    const exists = invoices.some((i) => i.id === inv.id);
+    setInvoices(exists ? invoices.map((i) => (i.id === inv.id ? inv : i)) : [...invoices, inv]);
+    setTx((cur) => reconcileTx(cur, inv));
+    setActiveId(inv.id);
     setEditing(null);
   };
   const remove = (id) => {
     if (!confirm('Delete this invoice?')) return;
     setInvoices(invoices.filter((i) => i.id !== id));
+    setTx((cur) => cur.filter((t) => t.invoiceId !== id));
     if (activeId === id) setActiveId(null);
+  };
+  // One-tap status change from the list (also reconciles the Finance income tx).
+  const setStatus = (inv, status) => {
+    const updated = { ...inv, status, paidDate: status === 'paid' ? (inv.paidDate || todayISO()) : inv.paidDate };
+    setInvoices(invoices.map((i) => (i.id === inv.id ? updated : i)));
+    setTx((cur) => reconcileTx(cur, updated));
   };
   const setLine = (id, patch) => setEditing({ ...editing, lines: editing.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) });
   const addLine = () => setEditing({ ...editing, lines: [...editing.lines, { id: newId(), description: '', qty: 1, rate: 0 }] });
@@ -165,6 +212,20 @@ export default function InvoicesApp() {
         </div>
       </section>
 
+      {invoices.length > 0 && (
+        <section className="card no-print">
+          <h2>💵 Accounts receivable</h2>
+          <div className="content">
+            <div className="fin-summary">
+              <div className="fin-stat expense"><span className="lbl">Outstanding · {ar.openCount} open</span><strong>{fmtAmount(ar.outstanding, profile.defaultCurrency)}</strong></div>
+              <div className={'fin-stat ' + (ar.overdue > 0 ? 'expense' : 'balance')}><span className="lbl">Overdue</span><strong>{fmtAmount(ar.overdue, profile.defaultCurrency)}</strong></div>
+              <div className="fin-stat income"><span className="lbl">Paid this year</span><strong>{fmtAmount(ar.paidYtd, profile.defaultCurrency)}</strong></div>
+            </div>
+            <div className="hint" style={{ marginTop: 8 }}>Marking an invoice <strong>Paid</strong> records a <strong>{FINANCE_CATEGORY}</strong> income entry in Finance automatically.</div>
+          </div>
+        </section>
+      )}
+
       <section className="card no-print">
         <h2>Invoices ({invoices.length})</h2>
         <div className="content">
@@ -185,19 +246,29 @@ export default function InvoicesApp() {
           </div>
           {sorted.length === 0 && <div className="hint">No invoices yet.</div>}
           <div className="list">
-            {sorted.map((inv) => (
+            {sorted.map((inv) => {
+              const isOverdue = inv.status !== 'paid' && inv.dueDate && inv.dueDate < todayISO();
+              return (
               <div key={inv.id} className="row">
                 <div>
                   <strong>#{inv.number || '—'}</strong> · {inv.client || 'Untitled'}<br />
-                  <small>{fmtDMY(inv.date)} · {fmtAmount(total(inv), inv.currency)} · {inv.status}</small>
+                  <small>
+                    {fmtDMY(inv.date)} · {fmtAmount(total(inv), inv.currency)} ·{' '}
+                    <span className={'inv-status ' + (isOverdue ? 'overdue' : inv.status)}>{isOverdue ? 'overdue' : inv.status}</span>
+                    {inv.status === 'paid' && <span className="inv-status paid" title="Recorded as income in Finance"> ✓ in Finance</span>}
+                  </small>
                 </div>
                 <div className="actions">
+                  {inv.status === 'paid'
+                    ? <button onClick={() => setStatus(inv, 'sent')} title="Revert to sent and remove the Finance entry">↩ Unpay</button>
+                    : <button className="primary" onClick={() => setStatus(inv, 'paid')}>💰 Mark paid</button>}
                   <button onClick={() => setActiveId(inv.id === activeId ? null : inv.id)}>{activeId === inv.id ? 'Hide' : 'View'}</button>
                   <button onClick={() => editExisting(inv)}>✎ Edit</button>
                   <button className="ghost" onClick={() => remove(inv.id)}>🗑</button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -225,6 +296,9 @@ export default function InvoicesApp() {
               <label className="span2">Client address<textarea rows={2} value={editing.clientAddress} onChange={(e) => setEditing({ ...editing, clientAddress: e.target.value })} /></label>
               <label>Invoice date<input type="date" value={editing.date} onChange={(e) => setEditing({ ...editing, date: e.target.value })} /></label>
               <label>Due date<input type="date" value={editing.dueDate} onChange={(e) => setEditing({ ...editing, dueDate: e.target.value })} /></label>
+              {editing.status === 'paid' && (
+                <label>Paid date<input type="date" value={editing.paidDate || editing.date || ''} onChange={(e) => setEditing({ ...editing, paidDate: e.target.value })} /></label>
+              )}
             </div>
 
             <table className="invoice-lines">

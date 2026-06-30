@@ -173,6 +173,13 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 .row small { color: var(--muted); }
 .row .actions button { margin-left: 8px; }
 
+/* Invoice status badges */
+.inv-status { font-weight: 600; text-transform: capitalize; }
+.inv-status.draft { color: var(--muted); }
+.inv-status.sent { color: var(--accent); }
+.inv-status.paid { color: var(--ok); }
+.inv-status.overdue { color: var(--danger); }
+
 .grid-2 { display: grid; grid-template-columns: 1.2fr .8fr; gap: 16px; }
 @media (max-width: 980px) { .grid-2 { grid-template-columns: 1fr; } }
 
@@ -327,6 +334,22 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
 .goal-fill { height: 100%; border-radius: 999px; min-width: 2%; background: var(--accent-grad); }
 .goal-fill.done { background: linear-gradient(135deg, #34d399, #10b981); }
 .goal-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+/* Today / home dashboard */
+.pill.strong { color: var(--text); font-weight: 600; border-color: var(--accent-border); background: var(--accent-2); }
+.home-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.home-hero-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+/* stat cards that double as nav buttons */
+.home-stat { cursor: pointer; text-align: left; font: inherit; transition: border-color .15s, transform .05s; }
+.home-stat:hover { border-color: var(--accent); }
+.home-stat:active { transform: translateY(1px); }
+/* a .row that acts as a clickable nav link */
+.home-reminder { cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.home-reminder:hover { border-color: var(--accent); }
+.rem-go { color: var(--muted); font-weight: 700; }
+.rem-tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; margin-right: 6px; background: var(--field-bg); border: 1px solid var(--border); color: var(--muted); }
+.rem-tag.warn { color: var(--warn); border-color: var(--warn); }
+.rem-tag.danger { color: var(--danger); border-color: var(--danger); }
 
 /* Balance trend */
 .trend { display: block; }
